@@ -7,11 +7,9 @@ from pathlib import Path
 from opeNN_dd_dataset import opeNN_dd_dataset
 from tqdm import tqdm
 
-from molecule_space_functions import parser
-
 HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
 NUM_EPOCHS = 3 # number of passes through data
-DATASET_DIR = os.path.join(HOME_DIR, 'dev/OpenNN_dd/src/data/') # directory of the tiny-imagenet-200 database
+DATASET_DIR = os.path.join(HOME_DIR, 'datasets/active-site/') # directory of the tiny-imagenet-200 database
 TRAIN_BATCH_SIZE = 16
 VAL_BATCH_SIZE = 16
 GRID_DIM = 32
