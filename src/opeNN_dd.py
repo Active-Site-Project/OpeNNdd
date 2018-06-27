@@ -1,4 +1,8 @@
 """ Required Imports """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import random
 import numpy as np
@@ -7,121 +11,121 @@ from pathlib import Path
 from opeNN_dd_dataset import opeNN_dd_dataset
 from tqdm import tqdm
 
-from molecule_space_functions import parser
+""" Configuration Options for Using GPUs """
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
 
 HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
 NUM_EPOCHS = 3 # number of passes through data
-DATASET_DIR = os.path.join(HOME_DIR, 'dev/OpenNN_dd/src/data/') # directory of the tiny-imagenet-200 database
-TRAIN_BATCH_SIZE = 16
-VAL_BATCH_SIZE = 16
+DATASET_DIR = os.path.join(HOME_DIR, 'dev', 'OpeNN_dd','src', 'data') # directory of the tiny-imagenet-200 database
+print("DATA PATH: ", DATASET_DIR)
+TRAIN_BATCH_SIZE = 25
+VAL_BATCH_SIZE = 125
 GRID_DIM = 32
 
-opeNN_dd_v1 = opeNN_dd_dataset(DATASET_DIR)
+""" Load Database """
+opeNN_dd_db = opeNN_dd_dataset(DATASET_DIR)
+opeNN_dd_db.load_train_val_test()
 
-opeNN_dd_v1.load_train_val_test()
-#opeNN_dd_v1.write_data_to_hdf5()
-num_train_ligands = opeNN_dd_v1.num_train_ligands
-num_val_ligands = opeNN_dd_v1.num_val_ligands
-num_test_ligands = opeNN_dd_v1.num_test_ligands
+""" Declare Some Constants """
+num_train_ligands = opeNN_dd_db.num_train_ligands
+num_val_ligands = opeNN_dd_db.num_val_ligands
+num_test_ligands = opeNN_dd_db.num_test_ligands
 grid_dim = GRID_DIM
-num_channels = opeNN_dd_v1.num_channels
-num_classes = opeNN_dd_v1.num_classes
-num_layers = 2
+num_channels = opeNN_dd_db.num_channels
+num_classes = opeNN_dd_db.num_classes
+
+""" Declare Model Hyperparameters """
+num_pool_layers = 2
 num_filters_conv1 = 32
 num_filters_conv2 = 64
+num_filters_conv3 = 128
+num_filters_conv4 = 256
+num_nodes_fc1 = 256
+
 filter_size_conv1 = 5
 filter_size_conv2 = 5
+filter_size_conv3 = 5
+filter_size_conv4 = 5
 
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
+""" Define Model Architecture """
 
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+""" Input Layer """
+input_layer = tf.placeholder(tf.float32, shape=[None, grid_dim, grid_dim, grid_dim, num_channels])
 
-def conv3D(x, W):
-    return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding="SAME")
+""" Labels (target values) """
+labels = tf.placeholder(tf.float32, shape=[None, 1])
 
-def max_pool3D(x):
-    return tf.nn.max_pool3d(x, ksize=[1,2,2,2,1], strides=[1,2,2,2,1], padding="SAME")
+""" Convolutional Layer #1 """
+conv1 = tf.layers.conv3d(
+    inputs = input_layer,
+    filters = num_filters_conv1,
+    kernel_size = [filter_size_conv1, filter_size_conv1, filter_size_conv1],
+    padding = "same",
+    activation = tf.nn.relu
+)
 
-x = tf.placeholder(tf.float32, shape=[None, grid_dim, grid_dim, grid_dim, num_channels])
-y_ = tf.placeholder(tf.float32, shape=[None, 1])
+""" Convolutional Layer #2 """
+conv2 = tf.layers.conv3d(
+    inputs = conv1,
+    filters = num_filters_conv2,
+    kernel_size = [filter_size_conv2, filter_size_conv2, filter_size_conv2],
+    padding = "same",
+    activation = tf.nn.relu
+)
 
-x_grid = tf.reshape(x, (-1, grid_dim, grid_dim, grid_dim, num_channels))
+""" Pooling Layer #1 """
+pool1 = tf.layers.max_pooling3d(inputs=conv2, pool_size=[2, 2, 2], strides=2)
 
-W_conv1 = weight_variable([filter_size_conv1, filter_size_conv1, filter_size_conv1, num_channels, num_filters_conv1])
-b_conv1 = bias_variable([num_filters_conv1])
+""" Convolutional Layer #3 """
+conv3 = tf.layers.conv3d(
+    inputs = pool1,
+    filters = num_filters_conv3,
+    kernel_size = [filter_size_conv3, filter_size_conv3, filter_size_conv3],
+    padding = "same",
+    activation = tf.nn.relu
+)
 
-h_conv1 = tf.nn.relu(conv3D(x_grid, W_conv1)+b_conv1)
-h_pool1 = max_pool3D(h_conv1)
+""" Convolutional Layer #4 """
+conv4 = tf.layers.conv3d(
+    inputs = conv3,
+    filters = num_filters_conv4,
+    kernel_size = [filter_size_conv4, filter_size_conv4, filter_size_conv4],
+    padding = "same",
+    activation = tf.nn.relu
+)
 
-W_conv2 = weight_variable([filter_size_conv2, filter_size_conv2, filter_size_conv2, num_filters_conv1, num_filters_conv2])
-b_conv2 = bias_variable([num_filters_conv2])
+""" Pooling Layer #2 """
+pool2 = tf.layers.max_pooling3d(inputs=conv4, pool_size = [2,2,2], strides=2)
 
-h_conv2 = tf.nn.relu(conv3D(h_pool1, W_conv2)+b_conv2)
-h_pool2 = max_pool3D(h_conv2)
+""" Flatten Final Pooling Layer """
+pool2_flat = tf.contrib.layers.flatten(inputs=pool2)
 
-pool_reduction = int(grid_dim/(2*pow(2, num_layers-1)))
-flat_res_2_layer = int(pool_reduction*pool_reduction*pool_reduction*num_filters_conv2)
+""" Dense Layer #1 """
+dense = tf.layers.dense(inputs=pool2_flat, units=num_nodes_fc1, activation=tf.nn.relu)
 
-h_pool2_flat = tf.reshape(h_pool2, [-1, flat_res_2_layer])
+""" Dropout Regularization for Dense Layer #1 """
+dropout = tf.layers.dropout(inputs=dense, rate=0.4)
 
-W_fc1 = weight_variable([flat_res_2_layer, 128])
-b_fc1 = bias_variable([128])
+""" Output Layer """
+output_layer = tf.layers.dense(inputs=dropout, units=1, name="output_layer")
 
-h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+""" Loss Calculations """
+quadratic_cost = tf.reduce_mean(tf.losses.mean_squared_error(labels = labels, predictions = output_layer), name="quadratic_cost")
 
-keep_prob = tf.placeholder(tf.float32)
-h_fc1_dropout = tf.nn.dropout(h_fc1, keep_prob)
-
-W_fc2 = weight_variable([128,num_classes])
-b_fc2 = bias_variable([num_classes])
-
-y_conv = tf.matmul(h_fc1_dropout, W_fc2) + b_fc2
-
-quadratic_cost = tf.reduce_mean(tf.losses.mean_squared_error(labels = y_, predictions = y_conv))
-#quadratic_cost = tf.Print(quadratic_cost_out, [quadratic_cost_out])
-
+""" Loss Minimization Step """
 train_step = tf.train.AdamOptimizer(1e-4).minimize(quadratic_cost)
-error_rate = tf.cast(tf.sigmoid(quadratic_cost), tf.float32)
-#accuracy = tf.reduce_mean(tf.metrics.accuracy(labels = y_, predictions = y_conv))
 
-
+""" Create Object for Saving Model (not fully implemented) """
 saver = tf.train.Saver()
-with tf.Session() as sess:
+
+""" Initialize TensorFlow Session + Training Loop """
+with tf.Session(config=config) as sess:
     sess.run(tf.global_variables_initializer())
-
-    try:
-        saver.restore(sess, "./tmp/model.ckpt")
-        print("Model restored.")
-    except:
-        pass
-
-    for i in range(NUM_EPOCHS):
-        print("Epoch #%d" % (i))
-        opeNN_dd_v1.shuffle_train_data()
-        for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
-            train_batch = opeNN_dd_v1.next_train_batch(TRAIN_BATCH_SIZE)
-            print("step: %d" % (j))
-            if j % 3 == 0 and j > 0:
-                val_batch = opeNN_dd_v1.next_val_batch(VAL_BATCH_SIZE)
-                #train_error = accuracy.eval(feed_dict = {x: train_batch[0], y_: train_batch[1], keep_prob: 1.0})
-                #val_error = accuracy.eval(feed_dict = {x: val_batch[0], y_: val_batch[1], keep_prob: 1.0})
-                train_error = 1-error_rate.eval(feed_dict={x: train_batch[0], y_: train_batch[1], keep_prob: 1.0})
-                val_error = 1-error_rate.eval(feed_dict={x: val_batch[0], y_: val_batch[1], keep_prob: 1.0})
-                train_loss = quadratic_cost.eval(feed_dict={x: train_batch[0], y_: train_batch[1], keep_prob: 1.0})
-                val_loss = quadratic_cost.eval(feed_dict={x: val_batch[0], y_: val_batch[1], keep_prob: 1.0})
-                print("step: %d" % (j))
-                print("train accuracy: %g" % (train_error))
-                print("train loss: %g" % (train_loss))
-                print("validation accuracy: %g" % (val_error))
-                print("validation loss: %g" % (val_loss))
-
-
-                save_path = saver.save(sess, "./tmp/model.ckpt")
-                print("Model saved in path: %s" % save_path)
-            train_step.run(feed_dict = {x: train_batch[0], y_: train_batch[1], keep_prob: 0.5})
-
-    opeNN_dd_v1.hdf5_file.close()
+    opeNN_dd_db.shuffle_train_data()
+    for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
+      train_batch = opeNN_dd_db.next_train_batch(TRAIN_BATCH_SIZE)
+      train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_batch[0], labels: train_batch[1]})
+      print("Target Value: ", targets)
+      print("CNN Output: ", outputs)
+      print("Quadratic Cost: ", err)

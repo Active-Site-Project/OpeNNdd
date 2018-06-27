@@ -22,8 +22,8 @@ class opeNN_dd_dataset:
         self.num_classes = 1
         self.num_channels = num_channels
         self.grid_dim = grid_dim
-        self.json_data_dir = os.path.join(data_set_dir, "json/conformers.zip")
-        self.hdf5_data_dir = os.path.join(data_set_dir, "hdf5/conformers.hdf5")
+        self.json_data_dir = os.path.join(data_set_dir,'json', 'conformers.zip')
+        self.hdf5_data_dir = os.path.join(data_set_dir, 'hdf5', 'conformers.hdf5')
         self.hdf5_file = tb.open_file(self.hdf5_data_dir, mode='r')
         self.train_batch_size = 16
         self.val_batch_size = 16
@@ -92,7 +92,6 @@ class opeNN_dd_dataset:
         self.train_storage = hdf5_file.create_earray(hdf5_file.root, 'train_ligands', self.lig_dtype, shape=data_shape)
         self.val_storage = hdf5_file.create_earray(hdf5_file.root, 'val_ligands', self.lig_dtype, shape=data_shape)
         self.test_storage = hdf5_file.create_earray(hdf5_file.root, 'test_ligands', self.lig_dtype, shape=data_shape)
-        self.mean_storage = hdf5_file.create_earray(hdf5_file.root, 'train_mean', self.lig_dtype, shape=data_shape)
 
         self.train_labels = hdf5_file.create_earray(hdf5_file.root, 'train_labels', self.label_dtype, shape=labels_shape)
         self.val_labels = hdf5_file.create_earray(hdf5_file.root, 'val_labels', self.label_dtype, shape=labels_shape)
@@ -102,18 +101,12 @@ class opeNN_dd_dataset:
 
         #Write Training Data to HDF5 File
         for i in range(self.num_train_ligands):
-            if i %375 == 0 and i > 1:
-                print('Train data: %d/%d' % (i, self.num_train_ligands))
             ligand, label = self.extract_json_data(self.training_data[i])
             self.train_storage.append(ligand[None])
             self.train_labels.append(label)
 
-            mean += ligand / float(self.num_train_ligands)
-
         #Write Validation Data to HDF5 File
         for i in range(self.num_val_ligands):
-            if i %125 == 0 and i > 1:
-                print('Validation data: %d/%d' % (i, self.num_val_ligands))
             ligand, label = self.extract_json_data(self.validation_data[i])
 
             self.val_storage.append(ligand[None])
@@ -121,14 +114,11 @@ class opeNN_dd_dataset:
 
         #Write Test Data to HDF5 File
         for i in range(self.num_test_ligands):
-            if i %125 == 0 and i > 1:
-                print('Test data: %d/%d' % (i, self.num_test_ligands))
             ligand, label = self.extract_json_data(self.test_data[i])
 
             self.test_storage.append(ligand[None])
             self.test_labels.append(label)
 
-        self.mean_storage.append(mean[None])
         hdf5_file.close()
 
     def next_train_batch(self, batch_size):
