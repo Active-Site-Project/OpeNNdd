@@ -12,7 +12,7 @@ import sys
 TRAIN_BATCH_SIZE = 5
 TRAIN_EPOCHS = 20
 GRID_DIM = 32
-num_pools = 2
+NUM_POOLS = 2
 HDF5_DATA_FILE = str(sys.argv[1])
 
 #-------------------------------------------------------------------------------
@@ -55,7 +55,7 @@ h_conv2 = tf.nn.relu(conv3D(h_pool1, W_conv2)+b_conv2)
 h_pool2 = max_pool3D(h_conv2)
 
 #fc layer 1
-pool_reduction = int(GRID_DIM / (2 * pow(2, num_pools-1))) #l, w of image after n pools
+pool_reduction = int(GRID_DIM / (2 * pow(2, NUM_POOLS-1))) #l, w of image after n pools
 flat_res_2_layer = int(pool_reduction * pool_reduction * pool_reduction * num_filters_conv2)
 h_pool2_flat = tf.reshape(h_pool2, [-1, flat_res_2_layer])
 W_fc1 = weight_variable([flat_res_2_layer, 128])
