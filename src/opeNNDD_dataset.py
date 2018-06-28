@@ -11,10 +11,10 @@ class OpeNNDD_Dataset:
     grid_dim = 72
 
     #instantiate with the hdf5 file and the train_batch_size of your choice
-    def __init__(self, data_file, train_batch_size):
-        assert os.path.exists(data_file), 'file does not exist' #make sure the path to the specified file exists
-        self.hdf5_file = tb.open_file(data_file, mode='r') #handle to file
-        self.total_train_ligands = len(self.hdf5_file.root.train_ligands) #placeholders for the real values
+    def __init__(self, hdf5_file, train_batch_size):
+        assert os.path.exists(hdf5_file), 'file does not exist' #make sure the path to the specified file exists
+        self.hdf5_file = tb.open_file(hdf5_file, mode='r') #handle to file
+        self.total_train_ligands = len(self.hdf5_file.root.train_ligands)
         self.total_val_ligands = len(self.hdf5_file.root.val_ligands)
         self.total_test_ligands = len(self.hdf5_file.root.test_ligands)
         self.train_indices = list(range(self.total_train_ligands)) #[0,total_train_ligands)... will be used later to shuffle the data between epochs and when loading initial batch if necessary
@@ -23,7 +23,6 @@ class OpeNNDD_Dataset:
         self.train_batch_size = train_batch_size #training batch size for getting next batch in the dataset
         self.total_train_steps = self.total_train_ligands / train_batch_size #total amount of steps in a single epoch dependent on the batch size
         self.train_ligands_processed = 0
-
 
     def shuffle_train_data(self):
         random.shuffle(self.train_indices)
@@ -43,6 +42,7 @@ class OpeNNDD_Dataset:
         if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
             self.train_ligands_processed  = 0
             batch_size = self.total_train_ligands%self.train_batch_size
+            print(batch_size)
         else:
             self.train_ligands_processed += self.train_batch_size #increment num of ligands we have currently processed
 
