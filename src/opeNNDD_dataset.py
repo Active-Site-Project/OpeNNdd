@@ -35,23 +35,26 @@ class OpeNNDD_Dataset:
 
 
     def next_train_batch(self):
-        index = self.train_ligands_processed
+        flag = False
         batch_size = self.train_batch_size
-        """ Conditional that accounts for case if the total number of training ligands does not divide evenly by minibatch size """
-        if (index + batch_size > self.total_train_ligands): # if index + batch_size will
-            batch_indices = self.train_indices[index:] # get all indices from the current index to the end of the dataset
-            self.shuffle_train_data() # reshuffle data after we reach the end of the dataset
-            index, batch_size = 0, self.total_train_ligands%batch_size
-        else:
-            batch_indices = self.train_indices[index:index+batch_size]
-            index += batch_size
+        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
+        batch_energies = np.zeros([batch_size])
+        #get the next batch
+        if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
+            flag = True
+            batch_size = self.total_train_ligands%self.train_batch_size
 
-        self.train_ligands_processed = index
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
         batch_energies = np.zeros([batch_size])
         for i in range(batch_size):
-            batch_ligands[i] = self.hdf5_file.root.train_ligands[batch_indices[i]]
-            batch_energies[i] = self.hdf5_file.root.train_labels[batch_indices[i]]
+            batch_ligands[i] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
+            batch_energies[i] = self.hdf5_file.root.train_labels[self.train_indices[i]]
+
+
+        if flag:
+            self.train_ligands_processed = 0
+        else:
+            self.train_ligands_processed += batch_size
 
         #return as np arrays
         return np.array(batch_ligands, dtype=np.float32), np.reshape(batch_energies, (batch_size,1))
