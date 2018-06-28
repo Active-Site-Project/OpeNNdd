@@ -43,7 +43,6 @@ class OpeNNDD_Dataset:
         if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
             flag = True
             batch_size = self.total_train_ligands%self.train_batch_size
-            print(batch_size)
 
         for i in range(self.train_ligands_processed, self.train_ligands_processed + batch_size):
             batch_ligands[i] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
