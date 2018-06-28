@@ -2,6 +2,7 @@ import os
 import tables as tb
 import numpy as np
 import random
+import math
 
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
@@ -21,7 +22,7 @@ class OpeNNDD_Dataset:
         self.val_indices = list(range(self.total_val_ligands)) #[0,total_val_ligands)
         self.test_indices = list(range(self.total_test_ligands)) #[0,total_test_ligands)
         self.train_batch_size = train_batch_size #training batch size for getting next batch in the dataset
-        self.total_train_steps = self.total_train_ligands / train_batch_size #total amount of steps in a single epoch dependent on the batch size
+        self.total_train_steps = int(math.ceil(self.total_train_ligands / train_batch_size)) #total amount of steps in a single epoch dependent on the batch size
         self.train_ligands_processed = 0
 
     def shuffle_train_data(self):
@@ -46,7 +47,6 @@ class OpeNNDD_Dataset:
 
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
         batch_energies = np.zeros([batch_size])
-        print(self.train_ligands_processed, self.train_ligands_processed+batch_size)
         for i in range(self.train_ligands_processed, self.train_ligands_processed+batch_size):
             batch_ligands[i-self.train_ligands_processed] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
             batch_energies[i-self.train_ligands_processed] = self.hdf5_file.root.train_labels[self.train_indices[i]]
