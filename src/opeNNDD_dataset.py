@@ -1,6 +1,7 @@
 import os
 import tables as tb
 import numpy as np
+import random
 
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
@@ -20,7 +21,6 @@ class OpeNNDD_Dataset:
         self.test_indices = list(range(self.total_test_ligands)) #[0,total_test_ligands)
         self.train_batch_size = train_batch_size #training batch size for getting next batch in the dataset
         self.total_train_steps = self.total_train_ligands / train_batch_size #total amount of steps in a single epoch dependent on the batch size
-        assert self.total_train_steps/int(self.total_train_steps) > 0.0, "Did not choose a batch_size that divides evenly into the total training set."
         self.train_ligands_processed = 0
 
     def shuffle_train_data(self):
@@ -34,39 +34,41 @@ class OpeNNDD_Dataset:
 
 
     def next_train_batch(self):
-        batch_ligands = []
-        batch_energies = []
+        batch_size = self.train_batch_size
+        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.num_channels])
+        batch_energies = np.zeros([batch_size])
         #get the next batch
-        for i in range(self.train_ligands_processed, self.train_ligands_processed + self.train_batch_size):
-            batch_ligands.append(self.data_file.root.train_ligands[self.train_indices[i]])
-            batch_energies.append([self.data_file.root.train_labels[self.train_indices[i]]]) #must put brackets to make a list
-
-        #if not train_batch_size ligands left,
         if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
-            self.train_ligands_processed = 0
+            self.train_ligands_processed  = 0
+            batch_size = self.total_train_ligands%self.train_batch_size
+        else:
+            self.train_ligands_processed += self.train_batch_size #increment num of ligands we have currently processed
 
-        self.train_ligands_processed += self.train_batch_size #increment num of ligands we have currently processed
+        for i in range(self.train_ligands_processed, self.train_ligands_processed + batch_size):
+            batch_ligands[i] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
+            batch_energies[i] = self.hdf5_file.root.train_labels[self.train_indices[i]]
 
         #return as np arrays
         return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)
 
 
     def val_set(self):
-        batch_ligands = []
-        batch_energies = []
+        batch_ligands = np.zeros([self.total_val_ligands, self.grid_dim, self.grid_dim, self.grid_dim, self.num_channels])
+        batch_energies = np.zeros([self.total_val_ligands])
         for i in self.val_indices:
-            batch_ligands.append(self.data_file.root.val_ligands[i])
-            batch_energies.append([self.data_file.root.val_labels[i]]) #must put brackets to make a list
+            batch_ligands[i] = self.hdf5_file.root.train_ligands[self.val_indices[i]]
+            batch_energies[i] = self.hdf5_file.root.train_labels[self.val_indices[i]]
+
 
         #return as np arrays
         return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)
 
     def test_set(self):
-        batch_ligands = []
-        batch_energies = []
+        batch_ligands = np.zeros([self.total_test_ligands, self.grid_dim, self.grid_dim, self.grid_dim, self.num_channels])
+        batch_energies = np.zeros([self.total_test_ligands])
         for i in self.test_indices:
-            batch_ligands.append(self.data_file.root.test_ligands[i])
-            batch_energies.append([self.data_file.root.test_labels[i]]) #must put brackets to make a list
+            batch_ligands[i] = self.hdf5_file.root.train_ligands[self.test_indices[i]]
+            batch_energies[i] = self.hdf5_file.root.train_labels[self.test_indices[i]]
 
         #return as np arrays
         return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)

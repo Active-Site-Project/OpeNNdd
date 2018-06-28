@@ -109,3 +109,4 @@ venv.bak/
 #misc
 data/
 .DS_Store
+tmp/
