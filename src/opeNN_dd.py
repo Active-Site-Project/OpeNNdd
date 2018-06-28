@@ -11,19 +11,11 @@ from pathlib import Path
 from opeNNDD_dataset import OpeNNDD_Dataset
 from tqdm import tqdm
 
-""" Configuration Options for Using GPUs """
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-
-HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
 NUM_EPOCHS = 3 # number of passes through data
 HDF5_DATA_FILE = str(sys.argv[1])
 TRAIN_BATCH_SIZE = 25
 VAL_BATCH_SIZE = 125
 GRID_DIM = 32
-
-""" Load Database """
-opeNN_dd_db = OpeNNDD_Dataset(HDF5_DATA_FILE, TRAIN_BATCH_SIZE)
 
 """ Declare Some Constants """
 num_train_ligands = opeNN_dd_db.total_train_ligands
@@ -119,6 +111,8 @@ saver = tf.train.Saver()
 
 """ Initialize TensorFlow Session + Training Loop """
 if __name__ == '__main__':
+    """ Load Database """
+    opeNN_dd_db = OpeNNDD_Dataset(HDF5_DATA_FILE, TRAIN_BATCH_SIZE)
     with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
         opeNN_dd_db.shuffle_train_data()
