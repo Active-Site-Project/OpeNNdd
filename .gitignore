@@ -1,5 +1,6 @@
 tmp/
 *.hdf5
+opeNN_dd.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
