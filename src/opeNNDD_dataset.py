@@ -6,7 +6,7 @@ import random
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
     """data stats"""
-    channels = 3 #num of channel for each image
+    channels = 2 #num of channel for each image
     classes = 1 #num of classifications will be one since we want continuous output
     grid_dim = 72
 
@@ -35,23 +35,26 @@ class OpeNNDD_Dataset:
 
 
     def next_train_batch(self):
+        index = self.train_ligands_processed
         batch_size = self.train_batch_size
+        """ Conditional that accounts for case if the total number of training ligands does not divide evenly by minibatch size """
+        if (index + batch_size > self.total_train_ligands): # if index + batch_size will
+            batch_indices = self.train_indices[index:] # get all indices from the current index to the end of the dataset
+            self.shuffle_train_data() # reshuffle data after we reach the end of the dataset
+            index, batch_size = 0, self.total_train_ligands%batch_size
+        else:
+            batch_indices = self.train_indices[index:index+batch_size]
+            index += batch_size
+
+        self.train_ligands_processed = index
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
         batch_energies = np.zeros([batch_size])
-        #get the next batch
-        if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
-            self.train_ligands_processed  = 0
-            batch_size = self.total_train_ligands%self.train_batch_size
-            print(batch_size)
-        else:
-            self.train_ligands_processed += self.train_batch_size #increment num of ligands we have currently processed
-
-        for i in range(self.train_ligands_processed, self.train_ligands_processed + batch_size):
-            batch_ligands[i] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
-            batch_energies[i] = self.hdf5_file.root.train_labels[self.train_indices[i]]
+        for i in range(batch_size):
+            batch_ligands[i] = self.hdf5_file.root.train_ligands[batch_indices[i]]
+            batch_energies[i] = self.hdf5_file.root.train_labels[batch_indices[i]]
 
         #return as np arrays
-        return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)
+        return np.array(batch_ligands, dtype=np.float32), np.reshape(batch_energies, (batch_size,1))
 
 
     def val_set(self):
@@ -73,4 +76,4 @@ class OpeNNDD_Dataset:
             batch_energies[i] = self.hdf5_file.root.train_labels[self.test_indices[i]]
 
         #return as np arrays
-        return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)
+        return np.array(batch_ligands, dtype=np.float32), np.asarray([batch_energies])
