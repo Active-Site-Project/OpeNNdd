@@ -1,6 +1,7 @@
 import os
 import tables as tb
 import numpy as np
+import random
 
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
