@@ -16,7 +16,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
-NUM_EPOCHS = 3 # number of passes through data
+NUM_EPOCHS = 50 # number of passes through data
 DATASET_DIR = os.path.join(HOME_DIR, 'dev', 'OpeNN_dd','src', 'data') # directory of the tiny-imagenet-200 database
 TRAIN_BATCH_SIZE = 25
 VAL_BATCH_SIZE = 125
@@ -39,7 +39,7 @@ num_filters_conv1 = 32
 num_filters_conv2 = 64
 num_filters_conv3 = 128
 num_filters_conv4 = 256
-num_nodes_fc1 = 256
+num_nodes_fc1 = 512
 
 filter_size_conv1 = 5
 filter_size_conv2 = 5
@@ -121,9 +121,10 @@ saver = tf.train.Saver()
 with tf.Session(config=config) as sess:
     sess.run(tf.global_variables_initializer())
     opeNN_dd_db.shuffle_train_data()
-    for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
-      train_batch = opeNN_dd_db.next_train_batch(TRAIN_BATCH_SIZE)
-      train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_batch[0], labels: train_batch[1]})
-      print("Target Value: ", targets)
-      print("CNN Output: ", outputs)
-      print("Quadratic Cost: ", err)
+    for i in range(NUM_EPOCHS):
+        for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
+          train_batch = opeNN_dd_db.next_train_batch()
+          train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_batch[0], labels: train_batch[1]})
+          print("Target Value: ", targets)
+          print("CNN Output: ", outputs)
+          print("Quadratic Cost: ", err)

@@ -42,18 +42,16 @@ class opeNN_dd_dataset:
 
     """ Functions for fetching next mini-batch in training/validation sets """
 
-    def next_train_batch(self, batch_size = self.batch_size):
+    def next_train_batch(self):
         index = self.train_batch_index
-        self.train_batch_size = batch_size
-
+        batch_size = self.train_batch_size
         """ Conditional that accounts for case if the total number of training ligands does not divide evenly by minibatch size """
         if (index + batch_size > self.num_train_ligands): # if index + batch_size will
             batch_indices = self.train_indices[index:] # get all indices from the current index to the end of the dataset
             self.shuffle_train_data() # reshuffle data after we reach the end of the dataset
-            batch_indices += self.train_indices[:batch_size - (self.num_train_ligands-index)] # append remainder of batch size to batch
-            index = batch_size-self.num_train_ligands%batch_size # update local index accordingly
+            index, batch_size = 0, self.num_train_ligands%batch_size
         else:
-            batch_indices = self.train_indices[index:index+batch_size] 
+            batch_indices = self.train_indices[index:index+batch_size]
             index += batch_size
 
         self.train_batch_index = index
@@ -66,14 +64,13 @@ class opeNN_dd_dataset:
         batch = [batch_ligands, np.reshape(batch_energies, (batch_size,1))]
         return batch
 
-    def next_val_batch(self, batch_size = self.batch_size):
+    def next_val_batch(self):
         index = self.val_batch_index
-        self.val_batch_size = batch_size
+        batch_size = self.val_batch_size
         if (index + batch_size > self.num_val_ligands):
             batch_indices = self.val_indices[index:]
             self.shuffle_val_data()
-            batch_indices += self.val_indices[:batch_size - (self.num_val_ligands-index)]
-            index = batch_size-self.num_val_ligands%batch_size
+            index, batch_size = 0, self.num_train_ligands%batch_size
         else:
             batch_indices = self.val_indices[index:index+batch_size]
             index += batch_size
