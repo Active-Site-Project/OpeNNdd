@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import random
+import sys
 import numpy as np
 import tensorflow as tf
 from pathlib import Path
@@ -17,13 +17,13 @@ config.gpu_options.allow_growth = True
 
 HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
 NUM_EPOCHS = 3 # number of passes through data
-DATASET_DIR = os.path.join(HOME_DIR, 'dev', 'OpeNN_dd','src', 'data', 'hdf5', 'conformers.hdf5') # directory of the tiny-imagenet-200 database
+HDF5_DATA_FILE = str(sys.argv[1])
 TRAIN_BATCH_SIZE = 25
 VAL_BATCH_SIZE = 125
 GRID_DIM = 32
 
 """ Load Database """
-opeNN_dd_db = OpeNNDD_Dataset(DATASET_DIR, TRAIN_BATCH_SIZE)
+opeNN_dd_db = OpeNNDD_Dataset(HDF5_DATA_FILE, TRAIN_BATCH_SIZE)
 
 """ Declare Some Constants """
 num_train_ligands = opeNN_dd_db.total_train_ligands
@@ -118,13 +118,14 @@ train_step = tf.train.AdamOptimizer(1e-4).minimize(quadratic_cost)
 saver = tf.train.Saver()
 
 """ Initialize TensorFlow Session + Training Loop """
-with tf.Session(config=config) as sess:
-    sess.run(tf.global_variables_initializer())
-    opeNN_dd_db.shuffle_train_data()
-    for i in range(NUM_EPOCHS):
-        for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
-          train_ligands, train_labels = opeNN_dd_db.next_train_batch()
-          train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_ligands, labels: train_labels})
-          print("Target Value: ", targets)
-          print("CNN Output: ", outputs)
-          print("Quadratic Cost: ", err)
+if __name__ == '__main__':
+    with tf.Session(config=config) as sess:
+        sess.run(tf.global_variables_initializer())
+        opeNN_dd_db.shuffle_train_data()
+        for i in range(NUM_EPOCHS):
+            for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
+              train_ligands, train_labels = opeNN_dd_db.next_train_batch()
+              train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_ligands, labels: train_labels})
+              print("Target Value: ", targets)
+              print("CNN Output: ", outputs)
+              print("Quadratic Cost: ", err)
