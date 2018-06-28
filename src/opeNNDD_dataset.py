@@ -6,7 +6,7 @@ import random
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
     """data stats"""
-    channels = 3 #num of channel for each image
+    channels = 2 #num of channel for each image
     classes = 1 #num of classifications will be one since we want continuous output
     grid_dim = 72
 
