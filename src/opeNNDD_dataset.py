@@ -35,20 +35,25 @@ class OpeNNDD_Dataset:
 
 
     def next_train_batch(self):
+        flag = False
         batch_size = self.train_batch_size
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
         batch_energies = np.zeros([batch_size])
         #get the next batch
         if (self.total_train_ligands - self.train_ligands_processed) < self.train_batch_size:
-            self.train_ligands_processed  = 0
+            flag = True
             batch_size = self.total_train_ligands%self.train_batch_size
             print(batch_size)
-        else:
-            self.train_ligands_processed += self.train_batch_size #increment num of ligands we have currently processed
 
         for i in range(self.train_ligands_processed, self.train_ligands_processed + batch_size):
             batch_ligands[i] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
             batch_energies[i] = self.hdf5_file.root.train_labels[self.train_indices[i]]
+
+
+        if flag:
+            self.train_ligands_processed = 0
+        else:
+            self.train_ligands_processed += batch_size
 
         #return as np arrays
         return np.array(batch_ligands, dtype=np.float32), np.array(batch_energies, dtype=np.float32)
