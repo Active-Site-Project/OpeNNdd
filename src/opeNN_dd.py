@@ -18,14 +18,12 @@ config.gpu_options.allow_growth = True
 HOME_DIR = str(Path.home()) # portable function to locate home directory on  a computer
 NUM_EPOCHS = 3 # number of passes through data
 DATASET_DIR = os.path.join(HOME_DIR, 'dev', 'OpeNN_dd','src', 'data') # directory of the tiny-imagenet-200 database
-print("DATA PATH: ", DATASET_DIR)
 TRAIN_BATCH_SIZE = 25
 VAL_BATCH_SIZE = 125
 GRID_DIM = 32
 
 """ Load Database """
 opeNN_dd_db = opeNN_dd_dataset(DATASET_DIR)
-opeNN_dd_db.load_train_val_test()
 
 """ Declare Some Constants """
 num_train_ligands = opeNN_dd_db.num_train_ligands
