@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Just disables the warning, doesn't enable AVX/FMA
 import sys
 import numpy as np
 import tensorflow as tf
@@ -15,15 +16,7 @@ NUM_EPOCHS = 3 # number of passes through data
 HDF5_DATA_FILE = str(sys.argv[1])
 TRAIN_BATCH_SIZE = 25
 VAL_BATCH_SIZE = 125
-GRID_DIM = 32
-
-""" Declare Some Constants """
-num_train_ligands = opeNN_dd_db.total_train_ligands
-num_val_ligands = opeNN_dd_db.total_val_ligands
-num_test_ligands = opeNN_dd_db.total_test_ligands
-grid_dim = GRID_DIM
-num_channels = opeNN_dd_db.channels
-num_classes = opeNN_dd_db.classes
+GRID_DIM = OpeNNDD_Dataset.grid_dim
 
 """ Declare Model Hyperparameters """
 num_pool_layers = 2
@@ -41,7 +34,7 @@ filter_size_conv4 = 5
 """ Define Model Architecture """
 
 """ Input Layer """
-input_layer = tf.placeholder(tf.float32, shape=[None, grid_dim, grid_dim, grid_dim, num_channels])
+input_layer = tf.placeholder(tf.float32, shape=[None, GRID_DIM, GRID_DIM, GRID_DIM, OpeNNDD_Dataset.channels])
 
 """ Labels (target values) """
 labels = tf.placeholder(tf.float32, shape=[None, 1])
@@ -111,13 +104,24 @@ saver = tf.train.Saver()
 
 """ Initialize TensorFlow Session + Training Loop """
 if __name__ == '__main__':
+
     """ Load Database """
     opeNN_dd_db = OpeNNDD_Dataset(HDF5_DATA_FILE, TRAIN_BATCH_SIZE)
-    with tf.Session(config=config) as sess:
+
+    """ Declare Some Constants """
+    num_train_ligands = opeNN_dd_db.total_train_ligands
+    num_val_ligands = opeNN_dd_db.total_val_ligands
+    num_test_ligands = opeNN_dd_db.total_test_ligands
+    num_channels = opeNN_dd_db.channels
+    num_classes = opeNN_dd_db.classes
+
+    """train loop"""
+    with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         opeNN_dd_db.shuffle_train_data()
+        #print(opeNN_dd_db.total_train_ligands)
         for i in range(NUM_EPOCHS):
-            for j in tqdm(range(int(num_train_ligands/TRAIN_BATCH_SIZE))):
+            for j in tqdm(range(int(opeNN_dd_db.total_train_steps))):
               train_ligands, train_labels = opeNN_dd_db.next_train_batch()
               train_op, outputs, targets, err = sess.run([train_step, output_layer, labels, quadratic_cost], feed_dict = {input_layer: train_ligands, labels: train_labels})
               print("Target Value: ", targets)
