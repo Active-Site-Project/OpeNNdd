@@ -32,13 +32,15 @@ class OpeNNDD_Dataset:
 
     def shuffle_train_data(self):
         random.shuffle(self.train_indices)
+        self.train_ligands_processed = 0
 
     def shuffle_val_data(self):
         random.shuffle(self.val_indices)
+        self.val_ligands_processed = 0
 
     def shuffle_test_data(self):
         random.shuffle(self.test_indices)
-
+        self.test_ligands_processed = 0
 
     def next_train_batch(self):
         flag = False
