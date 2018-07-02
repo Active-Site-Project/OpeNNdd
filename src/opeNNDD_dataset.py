@@ -48,8 +48,8 @@ class OpeNNDD_Dataset:
             flag = True
             batch_size = self.total_train_ligands%batch_size
 
-        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
-        batch_energies = np.zeros([batch_size])
+        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
+        batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.train_ligands_processed, self.train_ligands_processed+batch_size):
             batch_ligands[i-self.train_ligands_processed] = self.hdf5_file.root.train_ligands[self.train_indices[i]]
             batch_energies[i-self.train_ligands_processed] = self.hdf5_file.root.train_labels[self.train_indices[i]]
@@ -61,7 +61,7 @@ class OpeNNDD_Dataset:
             self.train_ligands_processed += batch_size
 
         #return as np arrays
-        return np.array(batch_ligands, dtype=np.float32), np.reshape(batch_energies, (batch_size,1))
+        return batch_ligands, np.reshape(batch_energies, (batch_size,1))
 
 
     def next_val_batch(self):
@@ -72,8 +72,8 @@ class OpeNNDD_Dataset:
             flag = True
             batch_size = self.total_val_ligands%batch_size
 
-        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
-        batch_energies = np.zeros([batch_size])
+        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
+        batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.val_ligands_processed, self.val_ligands_processed+batch_size):
             batch_ligands[i-self.val_ligands_processed] = self.hdf5_file.root.val_ligands[self.val_indices[i]]
             batch_energies[i-self.val_ligands_processed] = self.hdf5_file.root.val_labels[self.val_indices[i]]
@@ -85,7 +85,7 @@ class OpeNNDD_Dataset:
             self.val_ligands_processed += batch_size
 
         #return as np arrays
-        return np.array(batch_ligands, dtype=np.float32), np.reshape(batch_energies, (batch_size,1))
+        return batch_ligands, np.reshape(batch_energies, (batch_size,1))
 
     def next_test_batch(self):
         flag = False
@@ -95,8 +95,8 @@ class OpeNNDD_Dataset:
             flag = True
             batch_size = self.total_test_ligands%batch_size
 
-        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels])
-        batch_energies = np.zeros([batch_size])
+        batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
+        batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
             batch_ligands[i-self.test_ligands_processed] = self.hdf5_file.root.test_ligands[self.test_indices[i]]
             batch_energies[i-self.test_ligands_processed] = self.hdf5_file.root.test_labels[self.test_indices[i]]
@@ -108,4 +108,4 @@ class OpeNNDD_Dataset:
             self.test_ligands_processed += batch_size
 
         #return as np arrays
-        return np.array(batch_ligands, dtype=np.float32), np.reshape(batch_energies, (batch_size,1))
+        return batch_ligands, np.reshape(batch_energies, (batch_size,1))
