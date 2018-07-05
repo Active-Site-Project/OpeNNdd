@@ -7,12 +7,11 @@ import math
 #class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
 class OpeNNDD_Dataset:
     """data stats"""
-    channels = 2 #num of channel for each image
     classes = 1 #num of classifications will be one since we want continuous output
     grid_dim = 72
 
     #instantiate with the hdf5 file and the train_batch_size of your choice
-    def __init__(self, hdf5_file, batch_size):
+    def __init__(self, hdf5_file, batch_size, channels):
         assert os.path.exists(hdf5_file), 'file does not exist' #make sure the path to the specified file exists
         self.hdf5_file = tb.open_file(hdf5_file, mode='r') #handle to file
         self.total_train_ligands = len(self.hdf5_file.root.train_ligands)
@@ -25,6 +24,7 @@ class OpeNNDD_Dataset:
         self.total_train_steps = int(math.ceil(self.total_train_ligands / batch_size)) #total amount of steps in a single epoch dependent on the batch size
         self.total_val_steps = int(math.ceil(self.total_val_ligands/self.batch_size))
         self.total_test_steps = int(math.ceil(self.total_test_ligands/self.batch_size))
+        self.channels = channels
 
         self.train_ligands_processed = 0
         self.val_ligands_processed = 0

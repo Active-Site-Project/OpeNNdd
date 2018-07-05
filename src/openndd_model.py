@@ -16,6 +16,7 @@ class OpeNNDD_Model:
     def __init__(self,
         hdf5_file = None, #complete file path to the hdf5 file where the data is stored
         batch_size = None, #number of images to use for train, val and test batches
+        channels = None, #num of channel for each image
         conv_layers = None, #must provide a shape that each dim will specify features per layer.. ex. [32,64,64] -> 3 layers, filters of 32, 64, and 64 features
         conv_kernels = None, #must provide a shape that will specify kernel dim per layer.. ex. [3,5,5] -> 3x3x3 5x5x5 and 5x5x5 filters.. must have same num of dimenions as conv_layers
         pool_layers = None, #must provide a shape that each dim will specify filter size.. ex. [2,2,2] -> 3 pool layers, 2x2x2 filters and stride of 2 is always
@@ -30,7 +31,7 @@ class OpeNNDD_Model:
         assert (len(conv_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
         None if os.path.isdir(model_folder) else os.makedirs(model_folder) #create dir if need be
         model_folder += '/' if model_folder[-1] != '/' else None #append / onto model_folder if need be
-        self.db = open_data(hdf5_file, batch_size) #handle for the OpeNNDD dataset
+        self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNDD dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.pool_layers = pool_layers
@@ -83,7 +84,7 @@ class OpeNNDD_Model:
     #dynamicall build the network
     def build_network(self):
         self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
-        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, open_data.channels])}) #append placeholder for the inputs
+        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
         c_layer, p_layer, d_layer, f_layer = 0, 0, 0, 0 #counters for which of each type of layer we are on
 
         #append layers as desired
@@ -197,18 +198,19 @@ class OpeNNDD_Model:
 if __name__ == '__main__':
     #Constants
     BATCH_SIZE = 5 #images per batch
+    CHANNELS = 2
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(Path.home()) + "/models/OpeNNDD/model1" #path to where we would like our model stored
 
 
     if str(sys.argv[2]).lower() == "cpu":
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE,
+        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
                                 tf.train.AdamOptimizer, 'CPCPDFF',
                                 MODEL1_STORAGE_DIR)
     else:
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE,
+        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [128, 1], tf.losses.mean_squared_error,
                                 tf.train.AdamOptimizer, 'CPCPDFF',
