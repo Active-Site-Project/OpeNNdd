@@ -23,7 +23,7 @@ class OpeNNDD_Model:
         dropout_layers = None, #must be a shape where each dimension is the probability a neuron stays on or gets turned off... must check... ex. [.4,.4,.4] -> 3 layers with keep probability of 0.4
         fc_layers = None, #must provide a shape that each dim will specify units per connected layer.. ex. [1024,256,1] -> 3 layers, 1024 units, 256, units and 1 unit... last fully connected is the logits layer
         loss_function = None, #must be a tensorflow loss function
-        optimizer = None, #must be a tensorflow optimizing function
+        optimizer = None, #must be a tensorflow optimizing function with a learning rate already... see unit tests example below
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         model_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False #booling for whether or not to enable gpu mode
@@ -118,7 +118,7 @@ class OpeNNDD_Model:
 
         #append loss function and then optimizer
         self.network.update({'loss': tf.reduce_mean(self.loss_function(labels = self.network['labels'], predictions = self.network['logits']), name="quadratic_cost")})
-        self.network.update({'optimizer': self.optimizer(1e-4).minimize(self.network['loss'])})
+        self.network.update({'optimizer': self.minimize(self.network['loss'])})
 
     #train the model...includes validation
     def train(self):
@@ -131,9 +131,9 @@ class OpeNNDD_Model:
         saver = tf.train.Saver() #ops to save the model
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
+            prev_error = None
             while True: #we are going to fing the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
-                prev_error = 0.0
                 for step in tqdm(range(self.db.total_train_steps)):
                     print("Training Model... Step", step, "of", self.db.total_train_steps, "Epoch", self.epochs+1)
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
@@ -142,7 +142,9 @@ class OpeNNDD_Model:
                     print("CNN Output: ", outputs)
                     print("Quadratic Cost: ", err)
                 error = self.validate(sess)
-                if error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
+                if prev_error == None:
+                    prev_error = error
+                elif error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
                     saver.save(sess, self.model_folder)
                     return
                 self.epochs += 1
@@ -207,13 +209,13 @@ if __name__ == '__main__':
         model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer, 'CPCPDFF',
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
                                 MODEL1_STORAGE_DIR)
     else:
         model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [128, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer, 'CPCPDFF',
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
                                 MODEL1_STORAGE_DIR, True)
 
     model.train() #train the model
