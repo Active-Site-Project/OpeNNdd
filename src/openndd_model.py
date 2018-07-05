@@ -1,4 +1,4 @@
-from opeNNDD_dataset import OpeNNDD_Dataset as open_data#class for the OpeNNDD dataset
+from opeNNdd_dataset import OpeNNDD_Dataset as open_data#class for the OpeNNDD dataset
 from collections import OrderedDict #dictionary for holding network
 import tensorflow as tf #import tensorflow
 import sys #for unit tests
@@ -208,11 +208,7 @@ if __name__ == '__main__':
                                 tf.train.AdamOptimizer, 'CPCPDFF',
                                 MODEL1_STORAGE_DIR)
     else:
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE,
-                                [32,64], [5,5], [2,2], [0.4],
-                                [128, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer, 'CPCPDFF',
-                                MODEL1_STORAGE_DIR, True)
+
 
     model.train() #train the model
     error = model.test() #test the model and get the error
