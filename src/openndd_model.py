@@ -177,7 +177,7 @@ class OpeNNDD_Model:
             for step in tqdm(range(self.db.total_train_steps)):
                 print("Testing Model... Step", step, "of", self.db.total_test_steps)
                 test_ligands, test_labels = self.db.next_train_batch() #get next training batch
-                train_op, outputs, targets, err = sess.run([self.network['optimizer'], self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
+                outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 print("Target Value: ", targets)
                 print("CNN Output: ", outputs)
                 print("Quadratic Cost: ", err)
