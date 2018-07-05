@@ -140,19 +140,19 @@ class OpeNNDD_Model:
                     print("Target Value: ", targets)
                     print("CNN Output: ", outputs)
                     print("Quadratic Cost: ", err)
-                error = self.validate()
+                error = self.validate(sess)
                 if error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
                     saver.save(sess, self.model_folder)
                     return
                 self.epochs += 1
 
-    def validate(self):
+    def validate(self, sess):
         self.db.shuffle_val_data()
         total_error = 0.0
         for step in tqdm(range(self.db.total_val_steps)):
             print("Validating Model... Step", step, "of", self.db.total_val_steps)
             val_ligands, val_labels = self.db.next_val_batch()
-            output, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']])
+            outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']],  feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
             print("Target Value: ", targets)
             print("CNN Output: ", outputs)
             print("Quadratic Cost: ", err)
