@@ -118,7 +118,7 @@ class OpeNNDD_Model:
 
         #append loss function and then optimizer
         self.network.update({'loss': tf.reduce_mean(self.loss_function(labels = self.network['labels'], predictions = self.network['logits']), name="quadratic_cost")})
-        self.network.update({'optimizer': self.minimize(self.network['loss'])})
+        self.network.update({'optimizer': self.optimizer.minimize(self.network['loss'])})
 
     #train the model...includes validation
     def train(self):
