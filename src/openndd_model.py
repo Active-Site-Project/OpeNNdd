@@ -7,7 +7,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #disables AVX/FMA warning
 from tqdm import tqdm #progress bar
 from pathlib import Path #for getting home folder
 
-class OpeNNDD_Model:
+class OpeNNdd_Model:
     """
         Class to easily declare network models of different architectures and hyperparameters
         for the OpeNNDD_Dataset.
@@ -118,7 +118,7 @@ class OpeNNDD_Model:
 
         #append loss function and then optimizer
         self.network.update({'loss': tf.reduce_mean(self.loss_function(labels = self.network['labels'], predictions = self.network['logits']), name="quadratic_cost")})
-        self.network.update({'optimizer': self.minimize(self.network['loss'])})
+        self.network.update({'optimizer': self.optimizer.minimize(self.network['loss'])})
 
     #train the model...includes validation
     def train(self):
@@ -185,44 +185,3 @@ class OpeNNDD_Model:
                 print("Quadratic Cost: ", err)
                 total_error += err
         return total_error / self.db.total_test_steps
-
-
-#-------------------------------------------------------------------------------
-"""
-    Unit Tests... run this python program providing as command line argumentsthe complete path to the hdf5
-    file containing data for the OpeNNDD Dataset and either "cpu" or "gpu". Be careful to make sure that the
-    channels in the data file matches the channels variable in the OpeNNDD_Dataset class
-    in opeNNDD_dataset.py. This provided example will create a deep mnist
-    tensorflow example similar Architecture.
-"""
-
-
-if __name__ == '__main__':
-    #Constants
-    BATCH_SIZE = 5 #images per batch
-    CHANNELS = 2
-    HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
-    MODEL1_STORAGE_DIR = str(Path.home()) + "/models/OpeNNDD/model1" #path to where we would like our model stored
-
-
-    if str(sys.argv[2]).lower() == "cpu":
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [32,64], [5,5], [2,2], [0.4],
-                                [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
-                                MODEL1_STORAGE_DIR)
-    else:
-<<<<<<< HEAD
-
-=======
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [32,64], [5,5], [2,2], [0.4],
-                                [128, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
-                                MODEL1_STORAGE_DIR, True)
->>>>>>> b96c0d5087b9ae64e7fe4b006db984e5876c8d51
-
-    model.train() #train the model
-    error = model.test() #test the model and get the error
-    print("Error on entire test set:", error)
-    print("Optimal number of epochs for this architecture:", model.epochs)
