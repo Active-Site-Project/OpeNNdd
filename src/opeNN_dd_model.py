@@ -24,7 +24,8 @@ class OpeNNdd_Model:
         batch_size = 9, # batch_size of model
         num_output_units = 1, # number of outputs that the model should predict
         num_conv_filters = [32,64], # list containing number of convolutional filters for each desired convolutional layer
-        num_seq_conv = 1, # number of convolutional layers to do in a row before adding a pooling layer
+        uniform_num_seq_conv = None, # number of convolutional layers to do in a row before adding a pooling layer
+        num_seq_conv = [1,1],
         uniform_kernel_dim = 5, # setting if user does not want the kernel dimensions to change throughout model.
         kernel_dim = [5,5], # setting to specify custom kernel size for each layer, set uniform_kernel_dim to None and enter a single kernel dimension for each convolutional layer
         uniform_pool_dim = 2, # setting if user does not want the pooling dimensions to change throughout model.
@@ -49,30 +50,37 @@ class OpeNNdd_Model:
         self.opeNN_dd_db = OpeNNDD_Dataset(db_path, batch_size) # initialize OpeNNDD_Dataset instantiation with the HDF5 files in db_path and a batch of batch_size
         self.num_output_units = num_output_units
         self.num_conv_filters = num_conv_filters
-        self.num_seq_conv = num_seq_conv
+        self.num_conv_layers = len(num_conv_filters)
         self.num_dense_nodes = num_dense_nodes
+        self.num_dense_layers = len(num_dense_nodes)
         self.optimizer = optimizer
         self.init_learning_rate = init_learning_rate
         self.model_path = os.path.join(model_path, "model"+str(id), "model.ckpt") # path to store model parameters
 
         """ Initialize kernel, pooling, and dropout parameters based on uniform of custom function arguments """
+        if (uniform_num_seq_conv):
+            self.num_seq_conv = [uniform_num_seq_conv for i in range(int(self.num_conv_layers/uniform_num_seq_conv))]
+            print(self.num_seq_conv)
+        else:
+            self.num_seq_conv = num_seq_conv
+
         if (uniform_kernel_dim):
-            self.kernel_dim = [uniform_kernel_dim for i in range(len(num_conv_filters))]
+            self.kernel_dim = [uniform_kernel_dim for i in range(self.num_conv_layers)]
         else:
             self.kernel_dim = kernel_dim
 
         if (uniform_pool_dim):
-            self.pool_dim = [auto_pool_dim for i in range(len(num_conv_filters)//num_seq_conv)]
+            self.pool_dim = [uniform_pool_dim for i in range(len(num_seq_conv))]
         else:
             self.pool_dim = pool_dim
 
         if (uniform_dropout_conv):
-            self.dropout_conv = [auto_dropout_conv for i in range(len(num_conv_filters))]
+            self.dropout_conv = [uniform_dropout_conv for i in range(self.num_conv_layers)]
         else:
             self.dropout_conv = manual_dropout_conv
 
         if (uniform_dropout_dense):
-            self.dropout_dense = [auto_dropout_dense for i in range(len(num_dense_nodes))]
+            self.dropout_dense = [uniform_dropout_dense for i in range(self.num_dense_layers)]
         else:
             self.dropout_dense = manual_dropout_dense
 
@@ -86,15 +94,17 @@ class OpeNNdd_Model:
 
     def add_conv_blocks(self):
         num_conv = len(self.num_conv_filters) # number of convolutional layers in model
-        num_pool = int(num_conv/self.num_seq_conv) # number of pooling layers in model
+        num_pool = len(self.num_seq_conv)
+
 
         # number
-        if (num_conv%self.num_seq_conv != 0 or num_conv < self.num_seq_conv):
+        if (num_conv < len(self.num_seq_conv)):
             print("Total number of convolutional layers must be greater than and divisible by number of sequential layers before pooling step. Setting num_seq_conv to 1.")
             self.num_seq_conv = 1
 
         num_conv_pool_layers = 2*num_conv+num_pool # Need number of convolutional layers + number of convolutional dropout layers + number of pooling layers
         conv_count = 0
+        seq_conv_count = 0
         pool_count = 0
 
         """ Dynamically Build Convolutional and Pooling Layers """
@@ -116,15 +126,15 @@ class OpeNNdd_Model:
             self.layer_count += 1
 
             conv_count += 1 #increment number of convolutional counts to iterate through parameters specific to convolutional + dropout layers in the function params
-            print(self.layer_count-1, self.num_seq_conv, (self.layer_count-1)%self.num_seq_conv)
-            if (conv_count%self.num_seq_conv==0): #if the number of sequential convolutional layers specified divides the number of convolutional layer already inserted, add a pooling layer
+            seq_conv_count += 1
+            if (seq_conv_count == self.num_seq_conv[pool_count]): #if the number of sequential convolutional layers specified divides the number of convolutional layer already inserted, add a pooling layer
                 self.layer_list.append(
                     tf.layers.max_pooling3d(
                         inputs=self.layer_list[self.layer_count],
                         pool_size=[self.pool_dim[pool_count], self.pool_dim[pool_count], self.pool_dim[pool_count]],
                         strides=self.pool_dim[pool_count]
                     ))
-
+                seq_conv_count = 0
                 pool_count+=1 #increment number of pooling counts to iterate through parameters specific to pooling layers in the function params
                 self.layer_count+=1 #increment layer count to stay at the end of the list of layers in the model
 
