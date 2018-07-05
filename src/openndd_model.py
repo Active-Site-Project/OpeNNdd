@@ -16,13 +16,14 @@ class OpeNNDD_Model:
     def __init__(self,
         hdf5_file = None, #complete file path to the hdf5 file where the data is stored
         batch_size = None, #number of images to use for train, val and test batches
+        channels = None, #num of channel for each image
         conv_layers = None, #must provide a shape that each dim will specify features per layer.. ex. [32,64,64] -> 3 layers, filters of 32, 64, and 64 features
         conv_kernels = None, #must provide a shape that will specify kernel dim per layer.. ex. [3,5,5] -> 3x3x3 5x5x5 and 5x5x5 filters.. must have same num of dimenions as conv_layers
         pool_layers = None, #must provide a shape that each dim will specify filter size.. ex. [2,2,2] -> 3 pool layers, 2x2x2 filters and stride of 2 is always
         dropout_layers = None, #must be a shape where each dimension is the probability a neuron stays on or gets turned off... must check... ex. [.4,.4,.4] -> 3 layers with keep probability of 0.4
         fc_layers = None, #must provide a shape that each dim will specify units per connected layer.. ex. [1024,256,1] -> 3 layers, 1024 units, 256, units and 1 unit... last fully connected is the logits layer
         loss_function = None, #must be a tensorflow loss function
-        optimizer = None, #must be a tensorflow optimizing function
+        optimizer = None, #must be a tensorflow optimizing function with a learning rate already... see unit tests example below
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         model_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False #booling for whether or not to enable gpu mode
@@ -30,7 +31,7 @@ class OpeNNDD_Model:
         assert (len(conv_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
         None if os.path.isdir(model_folder) else os.makedirs(model_folder) #create dir if need be
         model_folder += '/' if model_folder[-1] != '/' else None #append / onto model_folder if need be
-        self.db = open_data(hdf5_file, batch_size) #handle for the OpeNNDD dataset
+        self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNDD dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.pool_layers = pool_layers
@@ -83,7 +84,7 @@ class OpeNNDD_Model:
     #dynamicall build the network
     def build_network(self):
         self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
-        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, open_data.channels])}) #append placeholder for the inputs
+        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
         c_layer, p_layer, d_layer, f_layer = 0, 0, 0, 0 #counters for which of each type of layer we are on
 
         #append layers as desired
@@ -117,7 +118,7 @@ class OpeNNDD_Model:
 
         #append loss function and then optimizer
         self.network.update({'loss': tf.reduce_mean(self.loss_function(labels = self.network['labels'], predictions = self.network['logits']), name="quadratic_cost")})
-        self.network.update({'optimizer': self.optimizer(1e-4).minimize(self.network['loss'])})
+        self.network.update({'optimizer': self.minimize(self.network['loss'])})
 
     #train the model...includes validation
     def train(self):
@@ -130,9 +131,9 @@ class OpeNNDD_Model:
         saver = tf.train.Saver() #ops to save the model
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
+            prev_error = None
             while True: #we are going to fing the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
-                prev_error = 0.0
                 for step in tqdm(range(self.db.total_train_steps)):
                     print("Training Model... Step", step, "of", self.db.total_train_steps, "Epoch", self.epochs+1)
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
@@ -140,19 +141,21 @@ class OpeNNDD_Model:
                     print("Target Value: ", targets)
                     print("CNN Output: ", outputs)
                     print("Quadratic Cost: ", err)
-                error = self.validate()
-                if error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
+                error = self.validate(sess)
+                if prev_error == None:
+                    prev_error = error
+                elif error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
                     saver.save(sess, self.model_folder)
                     return
                 self.epochs += 1
 
-    def validate(self):
+    def validate(self, sess):
         self.db.shuffle_val_data()
         total_error = 0.0
         for step in tqdm(range(self.db.total_val_steps)):
             print("Validating Model... Step", step, "of", self.db.total_val_steps)
             val_ligands, val_labels = self.db.next_val_batch()
-            output, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']])
+            outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']],  feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
             print("Target Value: ", targets)
             print("CNN Output: ", outputs)
             print("Quadratic Cost: ", err)
@@ -176,7 +179,7 @@ class OpeNNDD_Model:
             for step in tqdm(range(self.db.total_train_steps)):
                 print("Testing Model... Step", step, "of", self.db.total_test_steps)
                 test_ligands, test_labels = self.db.next_train_batch() #get next training batch
-                train_op, outputs, targets, err = sess.run([self.network['optimizer'], self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
+                outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 print("Target Value: ", targets)
                 print("CNN Output: ", outputs)
                 print("Quadratic Cost: ", err)
@@ -197,18 +200,27 @@ class OpeNNDD_Model:
 if __name__ == '__main__':
     #Constants
     BATCH_SIZE = 5 #images per batch
+    CHANNELS = 2
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(Path.home()) + "/models/OpeNNDD/model1" #path to where we would like our model stored
 
 
     if str(sys.argv[2]).lower() == "cpu":
-        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE,
+        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer, 'CPCPDFF',
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
                                 MODEL1_STORAGE_DIR)
     else:
+<<<<<<< HEAD
 
+=======
+        model = OpeNNDD_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
+                                [32,64], [5,5], [2,2], [0.4],
+                                [128, 1], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
+                                MODEL1_STORAGE_DIR, True)
+>>>>>>> b96c0d5087b9ae64e7fe4b006db984e5876c8d51
 
     model.train() #train the model
     error = model.test() #test the model and get the error
