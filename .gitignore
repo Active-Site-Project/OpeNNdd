@@ -1,6 +1,7 @@
 tmp/
 *.hdf5
-opeNN_dd.py
+model*.py
+layer_visual.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -112,4 +113,4 @@ data/
 .DS_Store
 tmp/
 main.py
-opeNN_dd2.py
+opeNN_dd.py

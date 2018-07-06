@@ -1,4 +1,4 @@
-from opeNNdd_dataset import OpeNNDD_Dataset as open_data#class for the OpeNNDD dataset
+from opeNNdd_dataset import OpeNNdd_Dataset as open_data#class for the OpeNNdd dataset
 from collections import OrderedDict #dictionary for holding network
 import tensorflow as tf #import tensorflow
 import sys #for unit tests
@@ -10,7 +10,7 @@ from pathlib import Path #for getting home folder
 class OpeNNdd_Model:
     """
         Class to easily declare network models of different architectures and hyperparameters
-        for the OpeNNDD_Dataset.
+        for the OpeNNdd_Dataset.
     """
 
     def __init__(self,
@@ -31,7 +31,7 @@ class OpeNNdd_Model:
         assert (len(conv_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
         None if os.path.isdir(model_folder) else os.makedirs(model_folder) #create dir if need be
         model_folder += '/' if model_folder[-1] != '/' else None #append / onto model_folder if need be
-        self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNDD dataset
+        self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.pool_layers = pool_layers
@@ -142,9 +142,9 @@ class OpeNNdd_Model:
                     print("CNN Output: ", outputs)
                     print("Quadratic Cost: ", err)
                 error = self.validate(sess)
-                if prev_error == None:
+                if prev_error == None or prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
                     prev_error = error
-                elif error > prev_error: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
+                else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
                     saver.save(sess, self.model_folder)
                     return
                 self.epochs += 1
@@ -176,12 +176,52 @@ class OpeNNdd_Model:
             saver.restore(sess, self.model_folder)
             self.db.shuffle_test_data() #shuffle training data between epochs
             total_error = 0.0
-            for step in tqdm(range(self.db.total_train_steps)):
+            for step in tqdm(range(self.db.total_test_steps)):
                 print("Testing Model... Step", step, "of", self.db.total_test_steps)
-                test_ligands, test_labels = self.db.next_train_batch() #get next training batch
+                test_ligands, test_labels = self.db.next_test_batch() #get next training batch
                 outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 print("Target Value: ", targets)
                 print("CNN Output: ", outputs)
                 print("Quadratic Cost: ", err)
                 total_error += err
         return total_error / self.db.total_test_steps
+<<<<<<< HEAD:src/openndd_model.py
+=======
+
+
+#-------------------------------------------------------------------------------
+"""
+    Unit Tests... run this python program providing as command line argumentsthe complete path to the hdf5
+    file containing data for the OpeNNdd Dataset and either "cpu" or "gpu". Be careful to make sure that the
+    channels in the data file matches the channels variable in the OpeNNdd_Dataset class
+    in OpeNNdd_dataset.py. This provided example will create a deep mnist
+    tensorflow example similar Architecture.
+"""
+
+
+if __name__ == '__main__':
+    #Constants
+    BATCH_SIZE = 5 #images per batch
+    CHANNELS = 2
+    HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
+    MODEL1_STORAGE_DIR = str(Path.home()) + "/models/OpeNNdd/mnist-model" #path to where we would like our model stored
+
+
+    if str(sys.argv[2]).lower() == "cpu":
+        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
+                                [32,64], [5,5], [2,2], [0.4],
+                                [1024, 1], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
+                                MODEL1_STORAGE_DIR)
+    else:
+        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
+                                [32,64], [5,5], [2,2], [0.4],
+                                [128, 1], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
+                                MODEL1_STORAGE_DIR, True)
+
+    model.train() #train the model
+    error = model.test() #test the model and get the error
+    print("Error on entire test set:", error)
+    print("Optimal number of epochs for this architecture:", model.epochs)
+>>>>>>> b1818f686d2a45b4ba4aee202a76c11ab33cf47e:src/opeNNdd_model.py

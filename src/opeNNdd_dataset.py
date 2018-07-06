@@ -4,8 +4,8 @@ import numpy as np
 import random
 import math
 
-#class for handling the OpeNNDD dataset.. takes a location to the data and a batch size for initialization
-class OpeNNDD_Dataset:
+#class for handling the OpeNNdd dataset.. takes a location to the data and a batch size for initialization
+class OpeNNdd_Dataset:
     """data stats"""
     classes = 1 #num of classifications will be one since we want continuous output
     grid_dim = 72
