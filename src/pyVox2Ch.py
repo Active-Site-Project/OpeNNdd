@@ -9,6 +9,7 @@
 import pybel
 import numpy as np
 import h5py
+from tqdm import tqdm
 from random import shuffle
 import os
 from math import ceil
@@ -17,7 +18,7 @@ from math import ceil
 voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
 #Replace path with path of directory containg all ligand poses
 posesPath = '/Users/brycekroencke/Documents/Fellowship/data/poses'
-cloudPath = '/Users/brycekroencke/Documents/3D-Representation/ElectronClouds'
+cloudPath = '/Users/brycekroencke/Documents/OpeNN_DD/ElectronClouds'
 voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid
 
@@ -51,13 +52,19 @@ def main():
             fileNames.append(filename)
     shuffle(fileNames)
 
+    desiredFiles = []
+    desiredSize = 4000
+    for i in range(desiredSize):
+        desiredFiles.append(fileNames[i])
+        
+
     """
         Calculates the training size, validation size, and test size based on
         the desired percentages. Then creates
     """
-    train_size = int(training * len(fileNames))
-    validation_size = int(validation * len(fileNames))
-    test_size = int(test * len(fileNames))
+    train_size = int(training * len(desiredFiles))
+    validation_size = int(validation * len(desiredFiles))
+    test_size = int(test * len(desiredFiles))
     train_data_shape = (train_size, voxelLWH, voxelLWH, voxelLWH, 2)
     train_label_shape = (train_size,)
     val_data_shape = (validation_size, voxelLWH, voxelLWH, voxelLWH, 2)
@@ -67,8 +74,8 @@ def main():
 
     data = []
     labels = []
-    for i in range(len(fileNames)):
-        sdfVox(fileNames[i], siteMatrix, xTrans, yTrans, zTrans, data, labels)
+    for i in tqdm(range(len(desiredFiles))):
+        sdfVox(desiredFiles[i], siteMatrix, xTrans, yTrans, zTrans, data, labels)
         os.chdir(posesPath)
 
     trainData = []

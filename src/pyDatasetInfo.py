@@ -11,7 +11,7 @@ voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
 def main():
     #Open and retrieve voxelized data from .hdf5 folder
     os.chdir(voxelizedDataPath)
-    h5f = h5py.File('voxelData.h5','r')
+    h5f = h5py.File('new.h5','r')
     trainData = h5f['train_ligands'][:]
     trainLabels = h5f['train_labels'][:]
     valData = h5f['val_ligands'][:]

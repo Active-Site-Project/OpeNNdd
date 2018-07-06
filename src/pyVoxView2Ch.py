@@ -14,9 +14,12 @@ from mpl_toolkits.mplot3d import Axes3D
 import os
 import sys
 
+
+
 def make_ax(grid=False):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
+    ax.set_axis_off()
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")
@@ -26,7 +29,7 @@ def make_ax(grid=False):
 def main():
     #replace path with path of directory contiaing voxelized data
     voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
-
+    plt.close("all")
     set = str(sys.argv[1]) #Which set to pull from, (train, val, test)
     index = int(sys.argv[2]) #Which index in the set to graph data
     mode = str(sys.argv[3]) #e = electrons, n = nuclei, b = both
@@ -60,28 +63,37 @@ def main():
         modePrintLabel = "Showing both electrons and nuclei"
 
     os.chdir(voxelizedDataPath)
-    h5f = h5py.File('voxelData.h5','r')
-    trainData = h5f['train_ligands'][:]
-    trainLabels = h5f['train_labels'][:]
-    valData = h5f['val_ligands'][:]
-    valLabels = h5f['val_labels'][:]
-    testData = h5f['test_ligands'][:]
-    testLabels = h5f['test_labels'][:]
+    h5f = h5py.File('activeCache.h5','r')
+    siteMatrix = h5f['activeCacheMatrix'][:]
     h5f.close()
 
 
+
+    h5f = h5py.File('voxelData.h5','r')
     if set in trainSet:
-        matrixArray = trainData
-        labelsArray = trainLabels
+        ligandProMatrix = h5f['train_ligands'][index,:,:,:,:]
+        ligandProLabel = h5f['train_labels'][index]
         setName = 'training data'
     elif set in valSet:
-        matrixArray = valData
-        labelsArray = valLabels
+        ligandProMatrix = h5f['val_ligands'][index,:,:,:,:]
+        ligandProLabel = h5f['val_labels'][index]
         setName = 'validation data'
     elif set in testSet:
-        matrixArray = testData
-        labelsArray = testLabels
+        ligandProMatrix = h5f['test_ligands'][index,:,:,:,:]
+        ligandProLabel = h5f['test_labels'][index]
         setName = 'testing data'
+    h5f.close()
+
+
+
+
+    ligandMatrixElectrons = np.subtract(ligandProMatrix[:,:,:,0], siteMatrix[:,:,:,0])
+    ligandMatrixNuclei = np.subtract(ligandProMatrix[:,:,:,1], siteMatrix[:,:,:,1])
+
+    np.set_printoptions(threshold=np.nan)
+    ligandMatrixElectrons = ligandMatrixElectrons.clip(min=0)
+    ligandMatrixNuclei = ligandMatrixNuclei.clip(min=0)
+
     print("\n" * 5)
     print('---------------------------------------------------------')
     print('                     Voxel Viewer')
@@ -89,16 +101,33 @@ def main():
     print("Mode               : "+modePrintLabel)
     print("Using              : "+setName)
     print("Data index         : "+str(index))
-    print("Interaction energy : "+str(labelsArray[index]))
+    print("Interaction energy : "+str(ligandProLabel))
     print('---------------------------------------------------------')
     print('            Graph may take a minute to load')
     print("\n" * 3)
 
+
+    actEColor = [1, 0, 0, .01]
+    actNColor = [0, 1, 1, .05]
+    ligEColor = [0, 0, 1, .1]
+    ligNColor = [1, 1, 0, .5]
+    line = [255/255,182/255,193/255,.03]
+
     ax = make_ax(True)
     if eShow:
-        ax.voxels(matrixArray[index,:,:,:,0], facecolors='#1f77b430', edgecolors='#1f77b430', alpha = .4)
+        ax.voxels(siteMatrix[:,:,:,0], facecolors=actEColor, edgecolors=line)
+        ax.voxels(ligandMatrixElectrons, facecolors=ligEColor, edgecolors=line)
+
+
     if nShow:
-        ax.voxels(matrixArray[index,:,:,:,1], facecolors='red', edgecolors='red')
+        ax.voxels(siteMatrix[:,:,:,1], facecolors=actNColor, edgecolors=line)
+        ax.voxels(ligandMatrixNuclei, facecolors=ligNColor, edgecolors=line)
+
+    ax.elev = -60
+    ax.azim = 230.1
+    ax.dist = 8.0
+
+
     plt.show()
 
 #Run the main fuction
