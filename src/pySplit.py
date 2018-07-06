@@ -21,7 +21,8 @@ def main():
 
     #Keep track of all file names inside of the read folder
     for filename in os.listdir(os.getcwd()):
-        nameList.append(filename)
+        if not filename.startswith('.'):
+            nameList.append(filename)
 
     i = 0 #Variable used to increment the filenames inside of the output folder
 
