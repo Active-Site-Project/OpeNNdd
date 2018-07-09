@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import os
 from math import ceil
+import sys
 
 def main():
     coords = [] #nucleus xyz location
@@ -12,14 +13,16 @@ def main():
     customYTransformation = 0 #in Angstroms
     customZTransformation = 7.5 #in Angstroms
 
-    os.chdir('/Users/brycekroencke/Documents/Fellowship/data')
+    file = str(sys.argv[1]) #file path to active site pdb
+    clouds = str(sys.argv[2]) #path to electron clouds directory
+    voxelizedDataPath = str(sys.argv[3]) #directory for where to save voxelized data
     """
         Reads in the active site pdb file and retrieves all atom (x,y,z)
         coordinates, all atomic numbers and the interation energy of the
         ligand/protien interaction.
     """
 
-    active = pybel.readfile("pdb", "SARS_3CLpro_5c5o_ActiveSiteAtomsOnly.pdb")
+    active = pybel.readfile("pdb", file)
     for mol in active:
         for atom in mol:
             coords.append(atom.coords)
@@ -28,7 +31,7 @@ def main():
     """
         Places electron cloud around each ligand atom.
     """
-    os.chdir('/Users/brycekroencke/Documents/OpeNN_DD/ElectronClouds')
+    os.chdir(clouds)
     for i in range(len(coords)):
         cloudFile = open(getAtomType(aNum[i]) + ".txt", 'r')
         for line in cloudFile:
@@ -67,8 +70,8 @@ def main():
     a = np.zeros((voxelLWH, voxelLWH, voxelLWH, 6))
     voxelizedActive = voxData(a, transformedElectrons)
 
-    os.chdir('/Users/brycekroencke/Documents/Fellowship/data/voxelized')
-    hf = h5py.File('activeCacheElementECount.h5', 'w')
+    os.chdir(voxelizedDataPath)
+    hf = h5py.File('activeCache6Channel.h5', 'w')
     hf.create_dataset('activeCacheMatrix', data=voxelizedActive)
     hf.create_dataset('activeCacheTransformations', data=activeMinTuple)
     hf.close()

@@ -9,11 +9,11 @@ import numpy as np
 import h5py
 import os
 from math import ceil
+import sys
 
-#replace path with location of active site pbd file
-activePath = '/Users/brycekroencke/Documents/Fellowship/data'
-voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
-cloudPath = '/Users/brycekroencke/Documents/3D-Representation/ElectronClouds'
+activePath = str(sys.argv[1]) #replace path with location of active site pbd file
+voxelizedDataPath = str(sys.argv[2]) #dir to store active cache
+cloudPath = str(sys.argv[3]) #path to dir containing electron cloud
 voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid (Angstroms/voxelRes)
 

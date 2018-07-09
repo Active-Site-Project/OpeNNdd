@@ -13,7 +13,7 @@ radius = float(sys.argv[1])         #sets Van Der Waals radius in Angstroms
 filename = str(sys.argv[2])+".txt"  #Creates file from user inputted element symbol
 num_pts = int(radius ** 2 * 4 * pi * 4) #makes a consistant number of electrons per radius
 indices = arange(0, num_pts, dtype=float) + 0.5
-path = "ElectronClouds/" #sets the save path into the ElectronClouds directory.
+path = str(sys.argv[3]) #path to directory of where to save electron clouds
 os.chdir(path)
 outFile = open(filename, 'w+')
 xv = []

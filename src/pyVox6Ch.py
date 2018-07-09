@@ -13,12 +13,11 @@ from tqdm import tqdm
 from random import shuffle
 import os
 from math import ceil
+import sys
 
-#Replace path with path of directory containing activeCache.hdf5
-voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
-#Replace path with path of directory containg all ligand poses
-posesPath = '/Users/brycekroencke/Documents/Fellowship/data/poses'
-cloudPath = '/Users/brycekroencke/Documents/OpeNN_DD/ElectronClouds'
+voxelizedDataPath = str(sys.argv[1]) #path of directory containing activeCache6Channel.hdf5 and where to store newly voxelized
+posesPath = str(sys.argv[2]) #path of directory containg all ligand poses
+cloudPath = str(sys.argv[3]) #path to electron clouds
 voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid
 
@@ -35,7 +34,7 @@ class dataInfo:
         self.i = 0
 
     def appendVal(self, values):
-        os.chdir('/Users/brycekroencke/Documents/Fellowship/data/voxelized')
+        os.chdir(voxelizedDataPath)
         with h5py.File('new.h5', mode='a') as h5f:
             dset = h5f[self.dataset]
             dset.resize((self.i + 1, ) + self.shape)
@@ -56,7 +55,7 @@ def main():
         outputs to.
     """
     os.chdir(voxelizedDataPath)
-    hf = h5py.File('activeCacheElementECount.h5','r')
+    hf = h5py.File('activeCache6Channel.h5','r')
     siteMatrix = hf['activeCacheMatrix'][:]
     trans = hf['activeCacheTransformations'][:]
     hf.close()
@@ -179,7 +178,7 @@ def sdfVox(name, activeMatrix, trans, d, l):
     aNum = []  #elements atomic number
     molEnergy = 0
     molCount = 0
-    os.chdir('/Users/brycekroencke/Documents/Fellowship/data/poses')
+    os.chdir(posesPath)
     for mol in pybel.readfile('sdf', name):
         if molCount > 0:
             raise RuntimeError('Only takes one molecule per sdf file. Use pySplit.py') from error
