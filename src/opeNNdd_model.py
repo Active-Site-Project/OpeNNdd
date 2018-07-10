@@ -157,18 +157,18 @@ class OpeNNdd_Model:
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
 
-            prev_error = None
+            prev_error = float('inf')
             while True: #we are going to fing the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
                 for step in tqdm(range(self.db.total_train_steps)):
                     print("Training Model... Step", step, "of", self.db.total_train_steps, "Epoch", self.epochs+1)
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
-                    train_op, outputs, targets = sess.run([self.network['optimizer'], self.network['logits'], self.network['labels']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
+                    train_op = sess.run([self.network['optimizer']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
                     mvpe = self.mean_value_percentage_error(targets, outputs)
                     train_iter+=1
 
                 error = self.validate(sess)
-                if prev_error == None or prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
+                if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
                     prev_error = error
                     saver.save(sess, os.path.join(self.model_folder, "model.ckpt"))
                 else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
@@ -186,15 +186,16 @@ class OpeNNdd_Model:
         for step in tqdm(range(self.db.total_val_steps)):
             print("Validating Model... Step", step, "of", self.db.total_val_steps)
             val_ligands, val_labels = self.db.next_val_batch()
-            outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']],  feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
+            if (step % 10 == 0):
+                merge = tf.summary.merge_all()
+                summary, err = sess.run([merge, self.network['loss']],  feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
+                train_writer.add_summary(summary, step)
+            else:
+                outputs, targets, err = sess.run([self.network['logits'], self.network['labels'], self.network['loss']],  feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
             mvpe = self.mean_value_percentage_error(targets, outputs)
 
             loss_arr[step] = mvpe
             total_error += err
-            if (step % 10 == 0):
-                merge = tf.summary.merge_all()
-                summary = sess.run([merge], feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels})
-                train_writer.add_summary(summary, step)
 
         self.val_mvpe_arr = np.append(self.val_mvpe_arr, loss_arr)
         plt.plot(self.val_mvpe_arr)
