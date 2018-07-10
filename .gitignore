@@ -112,5 +112,6 @@ venv.bak/
 data/
 .DS_Store
 tmp/
+logs/
 main.py
 opeNN_dd.py

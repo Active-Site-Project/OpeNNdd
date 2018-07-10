@@ -8,7 +8,7 @@
 """
 import pybel
 import numpy as np
-import h5py
+import tables 
 from tqdm import tqdm
 from random import shuffle
 import os
@@ -23,25 +23,11 @@ voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid
 
 
-
-
-
-
-
 class dataInfo:
     def __init__(self, dataset, shape):
         self.dataset = dataset
         self.shape = shape
         self.i = 0
-
-    def appendVal(self, values):
-        os.chdir('/Users/brycekroencke/Documents/Fellowship/data/voxelized')
-        with h5py.File('new.h5', mode='a') as h5f:
-            dset = h5f[self.dataset]
-            dset.resize((self.i + 1, ) + self.shape)
-            dset[self.i] = [values]
-            self.i += 1
-            h5f.flush()
 
 
 def main():
