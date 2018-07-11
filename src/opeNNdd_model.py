@@ -54,7 +54,7 @@ class OpeNNdd_Model:
         self.flattened = False #flag to know if we have already flattened the data once we come to fully connected layers
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
-        self.stop_threshold = 5
+        self.stop_threshold = 10
 
         self.train_mse_arr = np.empty([0], dtype=float)
         self.train_rmse_arr = np.empty([0], dtype=float)
@@ -80,11 +80,10 @@ class OpeNNdd_Model:
 
 
         #Changes to Train/Val/Test parameters to test logging functionality
-
-        self.db.total_train_steps = 10
-        self.db.total_val_steps = 10
-        self.db.total_test_steps = 10
-        self.stop_threshold = 1
+        #self.db.total_train_steps = 10
+        #self.db.total_val_steps = 10
+        #self.db.total_test_steps = 10
+        #self.stop_threshold = 7
 
 
     #3d conv with relu activation
@@ -170,10 +169,13 @@ class OpeNNdd_Model:
         plt.clf()
         plt.cla()
         plt.close()
+        delay = 1
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_mse_arr)
+                plt.plot(self.val_avg_mse_arr[delay:], 'b-', label='val')
+                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.legend(loc='upper right')
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mse_arr)
@@ -181,7 +183,9 @@ class OpeNNdd_Model:
         elif err_type.lower() == 'rmse':
             err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_rmse_arr)
+                plt.plot(self.val_avg_rmse_arr[delay:], 'b-', label='val')
+                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.legend(loc='upper right')
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_rmse_arr)
@@ -189,7 +193,9 @@ class OpeNNdd_Model:
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_mape_arr)
+                plt.plot(self.val_avg_mape_arr[delay:], 'b-', label='val')
+                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.legend(loc='upper right')
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mape_arr)
@@ -197,7 +203,7 @@ class OpeNNdd_Model:
         else:
             return
         plt.title('Validation - ' + metric_phrase + err_phrase)
-        plt.xlabel('Number of Validation ' + metric_iter)
+        plt.xlabel('Number of ' + metric_iter)
         plt.ylabel(metric_phrase + err_phrase + ' ' + units)
         folder = os.path.join(self.log_folder, 'metrics', 'val', err_key)
         if not os.path.isdir(folder):
@@ -206,6 +212,8 @@ class OpeNNdd_Model:
 
     def plot_test_err(self, err_type):
         plt.clf()
+        plt.cla()
+        plt.close()
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
             plt.plot(self.test_mse_arr)
@@ -274,8 +282,6 @@ class OpeNNdd_Model:
     #train the model...includes validation
     def train(self):
         None if self.network_built else self.build_network() #Dynamically build the network if need be
-        stop_count = 0
-        train_iter = 0
         config = tf.ConfigProto()
         if self.gpu_mode == True: # set gpu configurations if specified
             config.gpu_options.allow_growth = True
@@ -284,23 +290,28 @@ class OpeNNdd_Model:
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
 
-            #prev_error = float('inf')
-            prev_error = 0
+            prev_error = float('inf')
+            #prev_error = 0
             while True: #we are going to fing the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
-
+                total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
                 for step in tqdm(range(self.db.total_train_steps), desc = "Training Model - Epoch " + str(self.epochs+1)):
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
-                    train_op = sess.run([self.network['optimizer']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
-                    train_iter+=1
+                    train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
+                    rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
+                    total_mse += mse
+                    total_rmse += rmse
+                    total_mape += mape
 
-                error = self.validate(sess)
-                if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
-                    prev_error = error
-                    saver.save(sess, os.path.join(self.model_folder, str(self.id)))
-                else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
-                    stop_count+=1
-                    if (stop_count > self.stop_threshold):
+                if (self.epochs > 0 and self.epochs % self.stop_threshold == 0):
+                    self.train_avg_mse_arr = np.append(self.train_avg_mse_arr, total_mse / self.db.total_train_steps)
+                    self.train_avg_rmse_arr = np.append(self.train_avg_rmse_arr, total_rmse / self.db.total_train_steps)
+                    self.train_avg_mape_arr = np.append(self.train_avg_mape_arr, total_mape / self.db.total_train_steps)
+                    error = self.validate(sess)
+                    if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
+                        prev_error = error
+                        saver.save(sess, os.path.join(self.model_folder, str(self.id)))
+                    else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
                         self.plot_val_err('mse')
                         self.plot_val_err('mse', 'avg')
                         self.plot_val_err('rmse')
@@ -308,7 +319,7 @@ class OpeNNdd_Model:
                         self.plot_val_err('mape')
                         self.plot_val_err('mape', 'avg')
                         self.record_model_metrics('val')
-                        saver.save(sess, os.path.join(self.model_folder, str(self.id)))
+                        #saver.save(sess, os.path.join(self.model_folder, str(self.id)))
                         return
                 self.epochs += 1
 
@@ -330,6 +341,7 @@ class OpeNNdd_Model:
         self.val_mse_arr = np.append(self.val_mse_arr, mse_arr)
         self.val_rmse_arr = np.append(self.val_rmse_arr, rmse_arr)
         self.val_mape_arr = np.append(self.val_mape_arr, mape_arr)
+
         self.val_avg_mse_arr = np.append(self.val_avg_mse_arr, total_mse / self.db.total_val_steps)
         self.val_avg_rmse_arr = np.append(self.val_avg_rmse_arr, total_rmse / self.db.total_val_steps)
         self.val_avg_mape_arr = np.append(self.val_avg_mape_arr, total_mape / self.db.total_val_steps)
@@ -374,9 +386,17 @@ class OpeNNdd_Model:
             self.plot_test_err('mape')
             self.record_model_metrics('test')
 
+
+
+
+"""
+    Unit tests for OpeNNdd 2 channel dataset.
+"""
+
+
 if __name__ == '__main__':
     #Constants
-    BATCH_SIZE = 5 #images per batch
+    BATCH_SIZE = 9 #images per batch
     CHANNELS = 2
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(sys.argv[2])  #path to where we would like our model stored
