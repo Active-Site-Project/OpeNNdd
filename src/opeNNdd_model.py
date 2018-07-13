@@ -26,6 +26,7 @@ class OpeNNdd_Model:
         channels = None, #num of channel for each image
         conv_layers = None, #must provide a shape that each dim will specify features per layer.. ex. [32,64,64] -> 3 layers, filters of 32, 64, and 64 features
         conv_kernels = None, #must provide a shape that will specify kernel dim per layer.. ex. [3,5,5] -> 3x3x3 5x5x5 and 5x5x5 filters.. must have same num of dimenions as conv_layers
+        fire_layers = None,
         pool_layers = None, #must provide a shape that each dim will specify filter size.. ex. [2,2,2] -> 3 pool layers, 2x2x2 filters and stride of 2 is always
         dropout_layers = None, #must be a shape where each dimension is the probability a neuron stays on or gets turned off... must check... ex. [.4,.4,.4] -> 3 layers with keep probability of 0.4
         fc_layers = None, #must provide a shape that each dim will specify units per connected layer.. ex. [1024,256,1] -> 3 layers, 1024 units, 256, units and 1 unit... last fully connected is the logits layer
@@ -44,6 +45,7 @@ class OpeNNdd_Model:
         self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
+        self.fire_layers = fire_layers
         self.pool_layers = pool_layers
         self.dropout_layers = dropout_layers
         self.fc_layers = fc_layers
@@ -54,7 +56,7 @@ class OpeNNdd_Model:
         self.flattened = False #flag to know if we have already flattened the data once we come to fully connected layers
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
-        self.stop_threshold = 10
+        self.stop_threshold = 5
         self.min_epochs = 25
 
         self.train_mse_arr = np.zeros([1], dtype=float)
@@ -62,7 +64,7 @@ class OpeNNdd_Model:
         self.train_mape_arr = np.zeros([1], dtype=float)
         self.train_avg_mse_arr = np.zeros([1], dtype=float)
         self.train_avg_rmse_arr = np.zeros([1], dtype=float)
-        self.train_avg_mape_arr = np.zeros([0], dtype=float)
+        self.train_avg_mape_arr = np.zeros([1], dtype=float)
 
         self.val_mse_arr = np.zeros([0], dtype=float)
         self.val_rmse_arr = np.zeros([0], dtype=float)
@@ -95,6 +97,28 @@ class OpeNNdd_Model:
                                  name=name)
         return out
 
+    def fire_3d(self, inputs, filters, expand_filters, kernel_size, name=None):
+        out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
+                                 padding='same', activation=tf.nn.relu,
+                                 name=name)
+
+        expand1 = self.conv3d(out, filters=expand_filters, kernel_size= (1,1,1),
+                                 padding='same', activation=tf.nn.relu,
+                                 name=name)
+
+        expand2 = self.conv3d(inputs, filters=expand_filters, kernel_size= (1,1,1),
+                                 padding='same', activation=tf.nn.relu,
+                                 name=name)
+
+        out = tf.concat([expand1, expand2], 3)
+
+        return out
+
+    def avg_pool3d(self, inputs, pool_size, name=None):
+        out = tf.layers.average_pooling3d(inputs, pool_size=pool_size, strides=(2,2,2),
+                                        padding='same', name=name)
+        return out
+
     #max pooling with strides of 2 and same padding
     def max_pool3d(self, inputs, pool_size, name=None):
         out = tf.layers.max_pooling3d(inputs, pool_size=pool_size, strides=(2,2,2),
@@ -122,7 +146,7 @@ class OpeNNdd_Model:
     def build_network(self):
         self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
         self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
-        c_layer, p_layer, d_layer, f_layer = 0, 0, 0, 0 #counters for which of each type of layer we are on
+        c_layer, p_layer, d_layer, f_layer, h_layer, a_layer = 0, 0, 0, 0, 0, 0 #counters for which of each type of layer we are on
 
         #append layers as desired
         for command in self.ordering: #for each layer in network
@@ -132,25 +156,33 @@ class OpeNNdd_Model:
                 c_layer += 1
             elif command == 'p': #max_pooling
                 shape = (self.pool_layers[p_layer], self.pool_layers[p_layer], self.pool_layers[p_layer])
-                self.network.update({'pool'+str(p_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'pool'+str(p_layer))})
+                self.network.update({'max_pool'+str(p_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'max_pool'+str(p_layer))})
                 p_layer += 1
             elif command == 'd': #dropout
                 self.network.update({'dropout'+str(d_layer): tf.nn.dropout(self.network[next(reversed(self.network))], self.dropout_layers[d_layer])})
                 d_layer += 1
-            elif command == 'f': #fully connected
-                if f_layer == self.ordering.count('f') - 1: #we are appending the last fully connected layer.. so use dense no relu
+            elif command == 'f':
+                shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
+                self.network.update({'fire'+str(c_layer): self.fire_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], self.fire_layers[f_layer], shape, 'fire'+str(c_layer))})
+                c_layer += 1
+                f_layer += 1
+            elif command == 'a':
+                shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
+                self.network.update({'avg_pool'+str(a_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'avg_pool'+str(a_layer))})
+            elif command == 'h': #fully connected
+                if h_layer == self.ordering.count('h') - 1: #we are appending the last fully connected layer.. so use dense no relu
                     if self.flattened:
-                        self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.fc_layers[f_layer], 'logits')})
+                        self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'logits')})
                     else:
-                        self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[f_layer], 'logits')})
+                        self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'logits')})
                         self.flattened = True
                 else: #dense with relu
                     if self.flattened:
-                        self.network.update({'fc'+str(f_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[f_layer], 'fc'+str(f_layer))})
+                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'fc'+str(h_layer))})
                     else:
-                        self.network.update({'fc'+str(f_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[f_layer], 'fc'+str(f_layer))})
+                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'fc'+str(h_layer))})
                         self.flattened = True
-                f_layer += 1
+                h_layer += 1
         self.network_built = True
 
         #append loss function and then optimizer
@@ -432,15 +464,15 @@ if __name__ == '__main__':
 
     if str(sys.argv[3]).lower() == "cpu":
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [32,64], [5,5], [2,2], [0.4],
+                                [32,64], [5,5], [32], [2,2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
+                                tf.train.AdamOptimizer(1e-4), 'CFPDHH',
                                 MODEL1_STORAGE_DIR)
     else:
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32,64], [5,5], [2,2], [0.4],
                                 [128, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDFF',
+                                tf.train.AdamOptimizer(1e-4), 'CFPDHH',
                                 MODEL1_STORAGE_DIR, True)
 
     model.train() #train the model
