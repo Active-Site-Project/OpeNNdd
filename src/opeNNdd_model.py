@@ -55,24 +55,25 @@ class OpeNNdd_Model:
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
         self.stop_threshold = 10
+        self.min_epochs = 25
 
-        self.train_mse_arr = np.empty([0], dtype=float)
-        self.train_rmse_arr = np.empty([0], dtype=float)
-        self.train_mape_arr = np.empty([0], dtype=float)
-        self.train_avg_mse_arr = np.empty([0], dtype=float)
-        self.train_avg_rmse_arr = np.empty([0], dtype=float)
-        self.train_avg_mape_arr = np.empty([0], dtype=float)
+        self.train_mse_arr = np.zeros([1], dtype=float)
+        self.train_rmse_arr = np.zeros([1], dtype=float)
+        self.train_mape_arr = np.zeros([1], dtype=float)
+        self.train_avg_mse_arr = np.zeros([1], dtype=float)
+        self.train_avg_rmse_arr = np.zeros([1], dtype=float)
+        self.train_avg_mape_arr = np.zeros([0], dtype=float)
 
-        self.val_mse_arr = np.empty([0], dtype=float)
-        self.val_rmse_arr = np.empty([0], dtype=float)
-        self.val_mape_arr = np.empty([0], dtype=float)
-        self.val_avg_mse_arr = np.empty([0], dtype=float)
-        self.val_avg_rmse_arr = np.empty([0], dtype=float)
-        self.val_avg_mape_arr = np.empty([0], dtype=float)
+        self.val_mse_arr = np.zeros([0], dtype=float)
+        self.val_rmse_arr = np.zeros([0], dtype=float)
+        self.val_mape_arr = np.zeros([0], dtype=float)
+        self.val_avg_mse_arr = np.zeros([1], dtype=float)
+        self.val_avg_rmse_arr = np.zeros([1], dtype=float)
+        self.val_avg_mape_arr = np.zeros([1], dtype=float)
 
-        self.test_mse_arr = np.empty([0], dtype=float)
-        self.test_rmse_arr = np.empty([0], dtype=float)
-        self.test_mape_arr = np.empty([0], dtype=float)
+        self.test_mse_arr = np.zeros([0], dtype=float)
+        self.test_rmse_arr = np.zeros([0], dtype=float)
+        self.test_mape_arr = np.zeros([0], dtype=float)
         self.test_avg_mse_arr = 0
         self.test_avg_rmse_arr = 0
         self.test_avg_mape_arr = 0
@@ -80,10 +81,11 @@ class OpeNNdd_Model:
 
 
         #Changes to Train/Val/Test parameters to test logging functionality
+        #self.min_epochs = 5
         #self.db.total_train_steps = 10
         #self.db.total_val_steps = 10
         #self.db.total_test_steps = 10
-        #self.stop_threshold = 7
+        #self.stop_threshold = 0
 
 
     #3d conv with relu activation
@@ -155,6 +157,7 @@ class OpeNNdd_Model:
         self.network.update({'loss': tf.reduce_mean(self.loss_function(labels = self.network['labels'], predictions = self.network['logits']), name="quadratic_cost")})
         tf.summary.histogram("quadratic_cost", self.network['loss'])
         self.network.update({'optimizer': self.optimizer.minimize(self.network['loss'])})
+        self.optimal_epochs = 0
 
 
     def mean_absolute_percentage_error(self, target, prediction):
@@ -170,35 +173,48 @@ class OpeNNdd_Model:
         plt.cla()
         plt.close()
         delay = 1
+        self.val_avg_mse_arr[delay] = 0
+        self.train_avg_mse_arr[delay] = 0
+        self.val_avg_rmse_arr[delay] = 0
+        self.train_avg_rmse_arr[delay] = 0
+        self.val_avg_mape_arr[delay] = 0
+        self.train_avg_mape_arr[delay] = 0
+
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_mse_arr[delay:], 'b-', label='val')
-                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.plot(self.val_avg_mse_arr, 'b-', label='val')
+                plt.plot(self.train_avg_mse_arr, 'y-', label='train')
                 plt.legend(loc='upper right')
+                plt.xlim(xmin=2)
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mse_arr)
+                plt.xlim(xmin=1)
                 metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         elif err_type.lower() == 'rmse':
             err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_rmse_arr[delay:], 'b-', label='val')
-                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.plot(self.val_avg_rmse_arr, 'b-', label='val')
+                plt.plot(self.train_avg_rmse_arr, 'y-', label='train')
                 plt.legend(loc='upper right')
+                plt.xlim(xmin=2)
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_rmse_arr)
+                plt.xlim(xmin=1)
                 metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
             if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
-                plt.plot(self.val_avg_mape_arr[delay:], 'b-', label='val')
-                plt.plot(self.train_avg_mse_arr[delay:], 'y-', label='train')
+                plt.plot(self.val_avg_mape_arr, 'b-', label='val')
+                plt.plot(self.train_avg_mape_arr, 'y-', label='train')
                 plt.legend(loc='upper right')
+                plt.xlim(xmin=2)
                 metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mape_arr)
+                plt.xlim(xmin=1)
                 metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         else:
             return
@@ -217,12 +233,15 @@ class OpeNNdd_Model:
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
             plt.plot(self.test_mse_arr)
+            plt.xlim(xmin=1)
         elif err_type.lower() == 'rmse':
             err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
             plt.plot(self.test_rmse_arr)
+            plt.xlim(xmin=1)
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
             plt.plot(self.test_mape_arr)
+            plt.xlim(xmin=1)
         else:
             return
         plt.title('Testing - ' + err_phrase)
@@ -264,7 +283,8 @@ class OpeNNdd_Model:
             metrics_file.write("\nLoss Function: " + str(self.loss_function))
             metrics_file.write("\nOptimizer: " + str(self.optimizer))
 
-            metrics_file.write("\n\nTraining Epochs: " + str(self.epochs-self.stop_threshold+2))
+            metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs))
+            metrics_file.write("\nTotal Training Epochs: " + str(self.epochs))
         else:
             metrics_file = open(file, "a")
         if mode.lower() == 'validation' or mode.lower() == 'val':
@@ -289,7 +309,7 @@ class OpeNNdd_Model:
         saver = tf.train.Saver() #ops to save the model
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
-
+            stop_count = 0
             prev_error = float('inf')
             #prev_error = 0
             while True: #we are going to fing the number of epochs
@@ -303,24 +323,32 @@ class OpeNNdd_Model:
                     total_rmse += rmse
                     total_mape += mape
 
-                if (self.epochs > 0 and self.epochs % self.stop_threshold == 0):
-                    self.train_avg_mse_arr = np.append(self.train_avg_mse_arr, total_mse / self.db.total_train_steps)
-                    self.train_avg_rmse_arr = np.append(self.train_avg_rmse_arr, total_rmse / self.db.total_train_steps)
-                    self.train_avg_mape_arr = np.append(self.train_avg_mape_arr, total_mape / self.db.total_train_steps)
-                    error = self.validate(sess)
-                    if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
-                        prev_error = error
-                        saver.save(sess, os.path.join(self.model_folder, str(self.id)))
-                    else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
-                        self.plot_val_err('mse')
-                        self.plot_val_err('mse', 'avg')
-                        self.plot_val_err('rmse')
-                        self.plot_val_err('rmse', 'avg')
-                        self.plot_val_err('mape')
-                        self.plot_val_err('mape', 'avg')
-                        self.record_model_metrics('val')
-                        #saver.save(sess, os.path.join(self.model_folder, str(self.id)))
-                        return
+                #if (self.epochs > 0 and self.epochs % self.stop_threshold == 0):
+                self.train_avg_mse_arr = np.append(self.train_avg_mse_arr, total_mse / self.db.total_train_steps)
+                self.train_avg_rmse_arr = np.append(self.train_avg_rmse_arr, total_rmse / self.db.total_train_steps)
+                self.train_avg_mape_arr = np.append(self.train_avg_mape_arr, total_mape / self.db.total_train_steps)
+                error = self.validate(sess)
+
+                if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
+                    prev_error = error
+                    saver.save(sess, os.path.join(self.model_folder, str(self.id)))
+                    self.optimal_epochs = self.epochs
+                    stop_count = 0
+                else:
+                    stop_count += 1
+
+                #else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
+                if (self.epochs > self.min_epochs and stop_count > self.stop_threshold):
+                    self.plot_val_err('mse')
+                    self.plot_val_err('mse', 'avg')
+                    self.plot_val_err('rmse')
+                    self.plot_val_err('rmse', 'avg')
+                    self.plot_val_err('mape')
+                    self.plot_val_err('mape', 'avg')
+                    self.record_model_metrics('val')
+                    #saver.save(sess, os.path.join(self.model_folder, str(self.id)))
+                    return
+
                 self.epochs += 1
 
     def validate(self, sess):
@@ -342,11 +370,12 @@ class OpeNNdd_Model:
         self.val_rmse_arr = np.append(self.val_rmse_arr, rmse_arr)
         self.val_mape_arr = np.append(self.val_mape_arr, mape_arr)
 
+
         self.val_avg_mse_arr = np.append(self.val_avg_mse_arr, total_mse / self.db.total_val_steps)
         self.val_avg_rmse_arr = np.append(self.val_avg_rmse_arr, total_rmse / self.db.total_val_steps)
         self.val_avg_mape_arr = np.append(self.val_avg_mape_arr, total_mape / self.db.total_val_steps)
 
-        return self.val_avg_mse_arr[-1] #return the avg error
+        return total_mse / self.db.total_val_steps #return the avg error
 
     #restore the model and test
     def test(self):
