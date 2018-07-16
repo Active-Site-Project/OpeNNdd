@@ -94,21 +94,21 @@ class OpeNNdd_Model:
     def conv_3d(self, inputs, filters, kernel_size, name=None):
         out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
                                  padding='same', activation=tf.nn.relu,
-                                 name=name)
+                                 name=None)
         return out
 
     def fire_3d(self, inputs, filters, expand_filters, kernel_size, name=None):
         out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
                                  padding='same', activation=tf.nn.relu,
-                                 name=name)
+                                 name=None)
 
-        expand1 = self.conv3d(out, filters=expand_filters, kernel_size= (1,1,1),
+        expand1 = tf.layers.conv3d(out, filters=expand_filters, kernel_size= (1,1,1),
                                  padding='same', activation=tf.nn.relu,
-                                 name=name)
+                                 name=None)
 
-        expand2 = self.conv3d(inputs, filters=expand_filters, kernel_size= (1,1,1),
+        expand2 = tf.layers.conv3d(inputs, filters=expand_filters, kernel_size= (1,1,1),
                                  padding='same', activation=tf.nn.relu,
-                                 name=name)
+                                 name=None)
 
         out = tf.concat([expand1, expand2], 3)
 
@@ -341,6 +341,7 @@ class OpeNNdd_Model:
         saver = tf.train.Saver() #ops to save the model
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
+            print("initialized")
             stop_count = 0
             prev_error = float('inf')
             #prev_error = 0
@@ -464,15 +465,15 @@ if __name__ == '__main__':
 
     if str(sys.argv[3]).lower() == "cpu":
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [32,64], [5,5], [32], [2,2], [0.4],
+                                [32], [5,5], [32], [2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CFPDHH',
+                                tf.train.AdamOptimizer(1e-4), 'FPDHH',
                                 MODEL1_STORAGE_DIR)
     else:
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [32,64], [5,5], [2,2], [0.4],
-                                [128, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CFPDHH',
+                                [16], [5,5], [16], [2], [0.4],
+                                [1], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'FPDH',
                                 MODEL1_STORAGE_DIR, True)
 
     model.train() #train the model
