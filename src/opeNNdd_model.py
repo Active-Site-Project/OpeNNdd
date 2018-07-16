@@ -58,7 +58,7 @@ class OpeNNdd_Model:
         self.flattened = False #flag to know if we have already flattened the data once we come to fully connected layers
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
-        self.stop_threshold = 5
+        self.stop_threshold = 10
         self.min_epochs = 25
 
         self.train_mse_arr = np.zeros([1], dtype=float)
@@ -85,11 +85,11 @@ class OpeNNdd_Model:
 
 
         #Changes to Train/Val/Test parameters to test logging functionality
-        #self.min_epochs = 5
-        #self.db.total_train_steps = 10
-        #self.db.total_val_steps = 10
-        #self.db.total_test_steps = 10
-        #self.stop_threshold = 2
+        self.min_epochs = 5
+        self.db.total_train_steps = 10
+        self.db.total_val_steps = 10
+        self.db.total_test_steps = 10
+        self.stop_threshold = 2
 
 
     #3d conv with relu activation
@@ -112,7 +112,7 @@ class OpeNNdd_Model:
                                  padding='same', activation=tf.nn.relu,
                                  name=None)
 
-        out = tf.concat([expand1, expand2], 3)
+        out = tf.concat([expand1, expand2], 4)
 
         return out
 
@@ -146,45 +146,48 @@ class OpeNNdd_Model:
 
     #dynamically build the network
     def build_network(self):
-        self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
-        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
+        with tf.device("/cpu:0"):
+            self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
+            self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
         c_layer, p_layer, d_layer, f_layer, h_layer, a_layer = 0, 0, 0, 0, 0, 0 #counters for which of each type of layer we are on
 
-        #append layers as desired
-        for command in self.ordering: #for each layer in network
-            if command == 'c': #convolution
-                shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
-                self.network.update({'conv'+str(c_layer): self.conv_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], shape, 'conv'+str(c_layer))}) #append the desired conv layer
-                c_layer += 1
-            elif command == 'p': #max_pooling
-                shape = (self.pool_layers[p_layer], self.pool_layers[p_layer], self.pool_layers[p_layer])
-                self.network.update({'max_pool'+str(p_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'max_pool'+str(p_layer))})
-                p_layer += 1
-            elif command == 'd': #dropout
-                self.network.update({'dropout'+str(d_layer): tf.nn.dropout(self.network[next(reversed(self.network))], self.dropout_layers[d_layer])})
-                d_layer += 1
-            elif command == 'f':
-                shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
-                self.network.update({'fire'+str(c_layer): self.fire_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], self.fire_layers[f_layer], shape, 'fire'+str(c_layer))})
-                c_layer += 1
-                f_layer += 1
-            elif command == 'a':
-                shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
-                self.network.update({'avg_pool'+str(a_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'avg_pool'+str(a_layer))})
-            elif command == 'h': #fully connected
-                if h_layer == self.ordering.count('h') - 1: #we are appending the last fully connected layer.. so use dense no relu
-                    if self.flattened:
-                        self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'logits')})
-                    else:
-                        self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'logits')})
-                        self.flattened = True
-                else: #dense with relu
-                    if self.flattened:
-                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'fc'+str(h_layer))})
-                    else:
-                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'fc'+str(h_layer))})
-                        self.flattened = True
-                h_layer += 1
+        #append layers as desired  
+        with tf.device("/gpu:0"):
+            for command in self.ordering: #for each layer in network
+                if command == 'c': #convolution
+                    shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
+                    self.network.update({'conv'+str(c_layer): self.conv_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], shape, 'conv'+str(c_layer))}) #append the desired conv layer
+                    c_layer += 1
+                elif command == 'p': #max_pooling
+                    shape = (self.pool_layers[p_layer], self.pool_layers[p_layer], self.pool_layers[p_layer])
+                    self.network.update({'max_pool'+str(p_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'max_pool'+str(p_layer))})
+                    p_layer += 1
+                elif command == 'd': #dropout
+                    self.network.update({'dropout'+str(d_layer): tf.nn.dropout(self.network[next(reversed(self.network))], self.dropout_layers[d_layer])})
+                    d_layer += 1
+                elif command == 'f':
+                    shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
+                    self.network.update({'fire'+str(c_layer): self.fire_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], self.fire_layers[f_layer], shape, 'fire'+str(c_layer))})
+                    c_layer += 1
+                    f_layer += 1
+                elif command == 'a':
+                    shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
+                    self.network.update({'avg_pool'+str(a_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'avg_pool'+str(a_layer))})
+                elif command == 'h': #fully connected
+                    if h_layer == self.ordering.count('h') - 1: #we are appending the last fully connected layer.. so use dense no relu
+                        if self.flattened:
+                            self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'logits')})
+                        else:
+                            self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'logits')})
+                            self.flattened = True
+                    else: #dense with relu
+                        if self.flattened:
+                            self.network.update({'fc'+str(h_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'fc'+str(h_layer))})
+                        else:
+                            self.network.update({'fc'+str(h_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'fc'+str(h_layer))})
+                            self.flattened = True
+                    h_layer += 1
+
         self.network_built = True
 
         #append loss function and then optimizer
@@ -297,12 +300,14 @@ class OpeNNdd_Model:
             metrics_file.write("\nModel Folder: " + self.model_folder)
             metrics_file.write("\nLogging Folder: " + self.log_folder)
             metrics_file.write("\n\nModel Structure: \n")
-            conv_count, pool_count, fc_count, drop_count = 0,0,0,0
+            conv_count, fire_count, pool_count, fc_count, drop_count = 0,0,0,0,0
             metrics_file.write("Input Layer: Dimensions = %dx%dx%d, Number of Channels = %d\n"%(self.db.grid_dim, self.db.grid_dim, self.db.grid_dim, self.db.channels))
             for layer in list(self.network.keys()):
                 if (layer.find('conv') != -1):
                     metrics_file.write('Convolutional Layer %d: Number of Filters = %d, Kernel Size = %dx%dx%d\n' % (conv_count+1, self.conv_layers[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count]))
                     conv_count+=1
+                if (layer.find('fire') != -1):
+                    metrics_file.write('Fire Layer %d: Number of Shrink Filters = %d, Kernel Size = %dx%dx%d, Number of Expand Filters = %d, Kernel Size = %dx%d%d\n' % (fire_count+1, self.conv_layers[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], 2*self.fire_layers[fire_count], 1, 1, 1))
                 if (layer.find('pool') != -1):
                     metrics_file.write('Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
                     pool_count+=1
