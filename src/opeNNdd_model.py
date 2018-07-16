@@ -455,7 +455,7 @@ class OpeNNdd_Model:
     Unit tests for OpeNNdd 2 channel dataset.
 """
 
-
+"""
 if __name__ == '__main__':
     #Constants
     BATCH_SIZE = 9 #images per batch
@@ -463,18 +463,20 @@ if __name__ == '__main__':
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(sys.argv[2])  #path to where we would like our model stored
 
-    if str(sys.argv[3]).lower() == "cpu":
+    if str(sys.argv[3]).lower() == "gpu":
+        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
+                                [32,64], [5,5], [16], [2], [0.4],
+                                [1], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'FPDH',
+                                MODEL1_STORAGE_DIR, True)
+    else:
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
                                 [32], [5,5], [32], [2], [0.4],
                                 [1024, 1], tf.losses.mean_squared_error,
                                 tf.train.AdamOptimizer(1e-4), 'FPDHH',
-                                MODEL1_STORAGE_DIR)
-    else:
-        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,
-                                [16], [5,5], [16], [2], [0.4],
-                                [1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'FPDH',
-                                MODEL1_STORAGE_DIR, True)
+                                MODEL1_STORAGE_DIR, False)
+
 
     model.train() #train the model
     model.test() #test the model and get the error
+"""
