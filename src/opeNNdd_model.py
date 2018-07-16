@@ -2,6 +2,8 @@ from __future__ import division
 import math
 from opeNNdd_dataset import OpeNNdd_Dataset as open_data#class for the OpeNNdd dataset
 from collections import OrderedDict #dictionary for holding network
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import tensorflow as tf #import tensorflow
 import numpy as np
@@ -87,7 +89,7 @@ class OpeNNdd_Model:
         #self.db.total_train_steps = 10
         #self.db.total_val_steps = 10
         #self.db.total_test_steps = 10
-        #self.stop_threshold = 0
+        #self.stop_threshold = 2
 
 
     #3d conv with relu activation
@@ -142,7 +144,7 @@ class OpeNNdd_Model:
                                 name=name)
         return out
 
-    #dynamicall build the network
+    #dynamically build the network
     def build_network(self):
         self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
         self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
@@ -335,6 +337,7 @@ class OpeNNdd_Model:
     def train(self):
         None if self.network_built else self.build_network() #Dynamically build the network if need be
         config = tf.ConfigProto()
+        #tf.reset_default_graph()
         if self.gpu_mode == True: # set gpu configurations if specified
             config.gpu_options.allow_growth = True
 
@@ -348,7 +351,7 @@ class OpeNNdd_Model:
             while True: #we are going to fing the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
                 total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
-                for step in tqdm(range(self.db.total_train_steps), desc = "Training Model - Epoch " + str(self.epochs+1)):
+                for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(self.epochs+1)):
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
                     train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
                     rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
@@ -390,7 +393,7 @@ class OpeNNdd_Model:
         rmse_arr = np.zeros([self.db.total_val_steps], dtype=float)
         mape_arr = np.zeros([self.db.total_val_steps], dtype=float)
         total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
-        for step in tqdm(range(self.db.total_val_steps), desc = "Validating Model..."):
+        for step in tqdm(range(self.db.total_val_steps), desc = "Validating Model " + str(self.id) + "..."):
             val_ligands, val_labels = self.db.next_val_batch()
             outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels}) #train and return predictions with target values
             rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
@@ -427,7 +430,7 @@ class OpeNNdd_Model:
             #sess.run(tf.global_variables_initializer()) #initialize tf variables
             saver.restore(sess, os.path.join(self.model_folder, str(self.id)))
             self.db.shuffle_test_data() #shuffle training data between epochs
-            for step in tqdm(range(self.db.total_test_steps), desc = "Testing Model..."):
+            for step in tqdm(range(self.db.total_test_steps), desc = "Testing Model " + str(self.id) + "..."):
                 test_ligands, test_labels = self.db.next_test_batch() #get next training batch
                 outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
