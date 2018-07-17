@@ -3,8 +3,8 @@ import math
 from opeNNdd_dataset import OpeNNdd_Dataset as open_data#class for the OpeNNdd dataset
 from collections import OrderedDict #dictionary for holding network
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+matplotlib.use('Agg') #This line is needed in the case where there is no default display variable name. Allows matplotlib to work on summitdev
+import matplotlib.pyplot as plt # Library used to create error plots
 import tensorflow as tf #import tensorflow
 import numpy as np
 import sys #for unit tests
@@ -12,7 +12,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #disables AVX/FMA warning
 from tqdm import tqdm #progress bar
 from pathlib import Path #for getting home folder
-import random
+import random #random and datetime used to generate model id
 from datetime import datetime
 random.seed(datetime.now())
 
@@ -28,7 +28,7 @@ class OpeNNdd_Model:
         channels = None, #num of channel for each image
         conv_layers = None, #must provide a shape that each dim will specify features per layer.. ex. [32,64,64] -> 3 layers, filters of 32, 64, and 64 features
         conv_kernels = None, #must provide a shape that will specify kernel dim per layer.. ex. [3,5,5] -> 3x3x3 5x5x5 and 5x5x5 filters.. must have same num of dimenions as conv_layers
-        fire_layers = None,
+        fire_layers = None, #must be a list of lists where the first element in sublist is number of shrink filters, second element is kernel size for shrink conv, and third element is number of expand filters
         pool_layers = None, #must provide a shape that each dim will specify filter size.. ex. [2,2,2] -> 3 pool layers, 2x2x2 filters and stride of 2 is always
         dropout_layers = None, #must be a shape where each dimension is the probability a neuron stays on or gets turned off... must check... ex. [.4,.4,.4] -> 3 layers with keep probability of 0.4
         fc_layers = None, #must provide a shape that each dim will specify units per connected layer.. ex. [1024,256,1] -> 3 layers, 1024 units, 256, units and 1 unit... last fully connected is the logits layer
@@ -38,11 +38,13 @@ class OpeNNdd_Model:
         storage_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False #booling for whether or not to enable gpu mode
     ):
-        assert (len(conv_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
+        assert (len(conv_layers) + len(fire_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
         None if os.path.isdir(storage_folder) else os.makedirs(storage_folder) #create dir if need be
-        self.id = random.randint(100000, 999999)
-        self.storage_folder = storage_folder
-        self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id)) #append / onto model_folder if need be
+        None if os.path.isdir(os.path.join(storage_folder, 'tmp')) else os.makedirs(os.path.join(storage_folder, 'tmp'))
+        None if os.path.isdir(os.path.join(storage_folder, 'logs')) else os.makedirs(os.path.join(storage_folder, 'logs'))
+        self.id = random.randint(100000, 999999) #generate random 6-digit model id
+        self.storage_folder = storage_folder #storage folder for model and logs
+        self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
         self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
@@ -58,72 +60,90 @@ class OpeNNdd_Model:
         self.flattened = False #flag to know if we have already flattened the data once we come to fully connected layers
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
-        self.stop_threshold = 10
-        self.min_epochs = 25
+        self.stop_threshold = 10 #number of epochs that the network should check for an improvement in validation accuracy before stopping
+        self.min_epochs = 25 #minimum number of epochs that the network needs to train before early stopping ends training
 
-        self.train_mse_arr = np.zeros([1], dtype=float)
-        self.train_rmse_arr = np.zeros([1], dtype=float)
-        self.train_mape_arr = np.zeros([1], dtype=float)
-        self.train_avg_mse_arr = np.zeros([1], dtype=float)
-        self.train_avg_rmse_arr = np.zeros([1], dtype=float)
-        self.train_avg_mape_arr = np.zeros([1], dtype=float)
+        """ These arrays will hold the average mean squared error, average root mean squared error, and
+         average mean absolute percentage error across the training set every epoch (values will be appended to array) """
+        self.train_avg_mse_arr = np.zeros([2], dtype=float)
+        self.train_avg_rmse_arr = np.zeros([2], dtype=float)
+        self.train_avg_mape_arr = np.zeros([2], dtype=float)
 
-        self.val_mse_arr = np.zeros([0], dtype=float)
-        self.val_rmse_arr = np.zeros([0], dtype=float)
-        self.val_mape_arr = np.zeros([0], dtype=float)
-        self.val_avg_mse_arr = np.zeros([1], dtype=float)
-        self.val_avg_rmse_arr = np.zeros([1], dtype=float)
-        self.val_avg_mape_arr = np.zeros([1], dtype=float)
+        """ These arrays will hold the mean squared error,  root mean squared error, and mean absolute percentage error
+        across the validation set every batch (values will be appended to array) """
+        self.val_mse_arr = np.zeros([1], dtype=float)
+        self.val_rmse_arr = np.zeros([1], dtype=float)
+        self.val_mape_arr = np.zeros([1], dtype=float)
 
-        self.test_mse_arr = np.zeros([0], dtype=float)
-        self.test_rmse_arr = np.zeros([0], dtype=float)
-        self.test_mape_arr = np.zeros([0], dtype=float)
-        self.test_avg_mse_arr = 0
-        self.test_avg_rmse_arr = 0
-        self.test_avg_mape_arr = 0
+        """ These arrays will hold the average mean squared error, average root mean squared error, and
+         average mean absolute percentage error across the validation set every epoch (values will be appended to array) """
+        self.val_avg_mse_arr = np.zeros([2], dtype=float)
+        self.val_avg_rmse_arr = np.zeros([2], dtype=float)
+        self.val_avg_mape_arr = np.zeros([2], dtype=float)
+
+        """ These arrays will hold the mean squared error,  root mean squared error, and mean absolute percentage error
+        across the testing set every batch (values will be appended to array) """
+        self.test_mse_arr = np.zeros([1], dtype=float)
+        self.test_rmse_arr = np.zeros([1], dtype=float)
+        self.test_mape_arr = np.zeros([1], dtype=float)
+
+        self.test_avg_mse_arr = 0 #average mean squared error over the testing set
+        self.test_avg_rmse_arr = 0 #average root mean squared error over the testing set
+        self.test_avg_mape_arr = 0 #average mean absolute percentage error over the testing set
 
 
 
         #Changes to Train/Val/Test parameters to test logging functionality
-        self.min_epochs = 5
-        self.db.total_train_steps = 10
-        self.db.total_val_steps = 10
-        self.db.total_test_steps = 10
-        self.stop_threshold = 2
+        #self.min_epochs = 5
+        #self.db.total_train_steps = 10
+        #self.db.total_val_steps = 10
+        #self.db.total_test_steps = 10
+        #self.stop_threshold = 2
 
 
     #3d conv with relu activation
     def conv_3d(self, inputs, filters, kernel_size, name=None):
         out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
                                  padding='same', activation=tf.nn.relu,
-                                 name=None)
+                                 name=name)
         return out
 
+    #3d fire layer with relu activation
     def fire_3d(self, inputs, filters, expand_filters, kernel_size, name=None):
+        if (name):
+            shrink_name = name + '_shrink'
+            expand_name1 = name + '_expand1'
+            expand_name2 = name + 'expand2'
+        else:
+            shrink_name = None
+            expand_name1 = None
+            expand_name2 = None
+
         out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
                                  padding='same', activation=tf.nn.relu,
-                                 name=None)
+                                 name=shrink_name)
 
         expand1 = tf.layers.conv3d(out, filters=expand_filters, kernel_size= (1,1,1),
                                  padding='same', activation=tf.nn.relu,
-                                 name=None)
+                                 name=expand_name1)
 
         expand2 = tf.layers.conv3d(inputs, filters=expand_filters, kernel_size= (1,1,1),
                                  padding='same', activation=tf.nn.relu,
-                                 name=None)
+                                 name=expand_name2)
 
-        out = tf.concat([expand1, expand2], 4)
+        out = tf.concat([expand1, expand2], 4, name=name)
 
         return out
 
+    #average pooling with same padding
     def avg_pool3d(self, inputs, pool_size, name=None):
-        out = tf.layers.average_pooling3d(inputs, pool_size=pool_size, strides=(2,2,2),
+        out = tf.layers.average_pooling3d(inputs, pool_size=pool_size, strides=pool_size,
                                         padding='same', name=name)
         return out
 
-    #max pooling with strides of 2 and same padding
+    #max pooling with same padding
     def max_pool3d(self, inputs, pool_size, name=None):
-        out = tf.layers.max_pooling3d(inputs, pool_size=pool_size, strides=(2,2,2),
+        out = tf.layers.max_pooling3d(inputs, pool_size=pool_size, strides=pool_size,
                                         padding='same', name=name)
         return out
 
@@ -151,7 +171,7 @@ class OpeNNdd_Model:
             self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
         c_layer, p_layer, d_layer, f_layer, h_layer, a_layer = 0, 0, 0, 0, 0, 0 #counters for which of each type of layer we are on
 
-        #append layers as desired  
+        #append layers as desired
         with tf.device("/gpu:0"):
             for command in self.ordering: #for each layer in network
                 if command == 'c': #convolution
@@ -165,12 +185,11 @@ class OpeNNdd_Model:
                 elif command == 'd': #dropout
                     self.network.update({'dropout'+str(d_layer): tf.nn.dropout(self.network[next(reversed(self.network))], self.dropout_layers[d_layer])})
                     d_layer += 1
-                elif command == 'f':
-                    shape = (self.conv_kernels[c_layer], self.conv_kernels[c_layer], self.conv_kernels[c_layer]) #convert dim provided into a tuple
-                    self.network.update({'fire'+str(c_layer): self.fire_3d(self.network[next(reversed(self.network))], self.conv_layers[c_layer], self.fire_layers[f_layer], shape, 'fire'+str(c_layer))})
-                    c_layer += 1
+                elif command == 'f': #fire layer
+                    shape = (self.fire_layers[f_layer][1], self.fire_layers[f_layer][1], self.fire_layers[f_layer][1]) #convert dim provided into a tuple
+                    self.network.update({'fire'+str(f_layer): self.fire_3d(self.network[next(reversed(self.network))], self.fire_layers[f_layer][0], self.fire_layers[f_layer][2], shape, 'fire'+str(f_layer))})
                     f_layer += 1
-                elif command == 'a':
+                elif command == 'a': #average pooling
                     shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
                     self.network.update({'avg_pool'+str(a_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'avg_pool'+str(a_layer))})
                 elif command == 'h': #fully connected
@@ -197,72 +216,69 @@ class OpeNNdd_Model:
         self.optimal_epochs = 0
 
 
+    #function for calculation the mean absolute percentage error for a batch
     def mean_absolute_percentage_error(self, target, prediction):
-        err = 0
-        batch_size = target.shape[0]
+        err = 0 #start with zero error
+        assert (target.shape == prediction.shape), "List size is not equal for targets and predictions" #lists must be the same size
+        batch_size = target.shape[0] #get the length of the target list
         for i in range(batch_size):
-            err += abs(target[i][0]-prediction[i][0])/abs(target[i][0])
-        err *= 100/batch_size
+            err += abs(target[i][0]-prediction[i][0])/abs(target[i][0]) #append absolute error
+        err *= 100/batch_size #multiply by 100 to make error a percent and divide by batch_size to make error an average
         return err
 
     def plot_val_err(self, err_type, metric_type = ''):
+        #clear any existing plots
         plt.clf()
         plt.cla()
         plt.close()
-        delay = 1
-        self.val_avg_mse_arr[delay] = 0
-        self.train_avg_mse_arr[delay] = 0
-        self.val_avg_rmse_arr[delay] = 0
-        self.train_avg_rmse_arr[delay] = 0
-        self.val_avg_mape_arr[delay] = 0
-        self.train_avg_mape_arr[delay] = 0
 
+        avg_flag = False #flag for checking if user wants average validation vs train or regular validation error across each batch
+        if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
+            avg_flag = True
+            metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs' #key phrases for making graph
+        else:
+            metric_phrase, metric_key, metric_iter = '', '', 'Batches'
+
+        #updates error phrases, data, and units label depending on what error type is passed in
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
-            if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
+            if avg_flag:
                 plt.plot(self.val_avg_mse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_mse_arr, 'y-', label='train')
-                plt.legend(loc='upper right')
-                plt.xlim(xmin=2)
-                metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mse_arr)
-                plt.xlim(xmin=1)
-                metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         elif err_type.lower() == 'rmse':
             err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
-            if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
+            if avg_flag:
                 plt.plot(self.val_avg_rmse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_rmse_arr, 'y-', label='train')
-                plt.legend(loc='upper right')
-                plt.xlim(xmin=2)
-                metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_rmse_arr)
-                plt.xlim(xmin=1)
-                metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
-            if metric_type.lower() == 'average' or metric_type.lower() == 'avg':
+            if avg_flag:
                 plt.plot(self.val_avg_mape_arr, 'b-', label='val')
                 plt.plot(self.train_avg_mape_arr, 'y-', label='train')
-                plt.legend(loc='upper right')
-                plt.xlim(xmin=2)
-                metric_phrase, metric_key, metric_iter = 'Average ', 'avg_', 'Epochs'
             else:
                 plt.plot(self.val_mape_arr)
-                plt.xlim(xmin=1)
-                metric_phrase, metric_key, metric_iter = '', '', 'Batches'
         else:
             return
-        plt.title('Validation - ' + metric_phrase + err_phrase)
-        plt.xlabel('Number of ' + metric_iter)
-        plt.ylabel(metric_phrase + err_phrase + ' ' + units)
-        folder = os.path.join(self.log_folder, 'metrics', 'val', err_key)
-        if not os.path.isdir(folder):
-            os.makedirs(folder)
-        plt.savefig(os.path.join(folder, 'val_' + metric_key + err_key + '_'+ str(self.id)+'.png'))
 
+        if avg_flag:
+            plt.legend(loc='upper right') #location of train vs test legend
+            plt.xlim(xmin=2)
+        else:
+            plt.xlim(xmin=1) #start graph at epoch/batch 1
+
+        plt.title('Validation - ' + metric_phrase + err_phrase) #make plot title
+        plt.xlabel('Number of ' + metric_iter) #make label for x-axis
+        plt.ylabel(metric_phrase + err_phrase + ' ' + units) #make label for y-axis
+        folder = os.path.join(self.log_folder, 'metrics', 'val', err_key) #create folder to save logs in
+        if not os.path.isdir(folder): #if folder does not exist, create it
+            os.makedirs(folder)
+        plt.savefig(os.path.join(folder, 'val_' + metric_key + err_key + '_'+ str(self.id)+'.png')) #save fig to logging folder
+
+    #similar function to plot_val_err, but plots the test error on its own
     def plot_test_err(self, err_type):
         plt.clf()
         plt.cla()
@@ -270,17 +286,16 @@ class OpeNNdd_Model:
         if err_type.lower() == 'mse':
             err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
             plt.plot(self.test_mse_arr)
-            plt.xlim(xmin=1)
         elif err_type.lower() == 'rmse':
             err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
             plt.plot(self.test_rmse_arr)
-            plt.xlim(xmin=1)
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
             plt.plot(self.test_mape_arr)
-            plt.xlim(xmin=1)
         else:
             return
+
+        plt.xlim(xmin=1)
         plt.title('Testing - ' + err_phrase)
         plt.xlabel('Number of Testing Batches')
         plt.ylabel(err_phrase + ' ' + units)
@@ -289,28 +304,35 @@ class OpeNNdd_Model:
             os.makedirs(folder)
         plt.savefig(os.path.join(folder, 'test_' +err_key + '_'+ str(self.id)+'.png'))
 
+    # function that records performance and info of model in a text file
     def record_model_metrics(self, mode):
-        folder = os.path.join(self.log_folder, 'metrics')
-        file = os.path.join(folder, 'metrics.txt')
-        if not os.path.isdir(folder):
+        folder = os.path.join(self.log_folder, 'metrics') #folder to save test file in
+        file = os.path.join(folder, 'metrics.txt') #name of text file
+        if not os.path.isdir(folder): #if folder for metrics file does not exist, create it
             os.makedirs(folder)
-        if not os.path.exists(file):
+        if not os.path.exists(file): #if the metrics file does not exist, create it and write initial model information
             metrics_file = open(file, 'w')
             metrics_file.write("Model ID: " + str(self.id))
             metrics_file.write("\nModel Folder: " + self.model_folder)
             metrics_file.write("\nLogging Folder: " + self.log_folder)
             metrics_file.write("\n\nModel Structure: \n")
-            conv_count, fire_count, pool_count, fc_count, drop_count = 0,0,0,0,0
+            conv_count, fire_count, max_pool_count, avg_pool_count, fc_count, drop_count = 0,0,0,0,0,0
             metrics_file.write("Input Layer: Dimensions = %dx%dx%d, Number of Channels = %d\n"%(self.db.grid_dim, self.db.grid_dim, self.db.grid_dim, self.db.channels))
+
+            #write model information to file, layer by layer
             for layer in list(self.network.keys()):
                 if (layer.find('conv') != -1):
                     metrics_file.write('Convolutional Layer %d: Number of Filters = %d, Kernel Size = %dx%dx%d\n' % (conv_count+1, self.conv_layers[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count]))
                     conv_count+=1
                 if (layer.find('fire') != -1):
-                    metrics_file.write('Fire Layer %d: Number of Shrink Filters = %d, Kernel Size = %dx%dx%d, Number of Expand Filters = %d, Kernel Size = %dx%d%d\n' % (fire_count+1, self.conv_layers[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], self.conv_kernels[conv_count], 2*self.fire_layers[fire_count], 1, 1, 1))
-                if (layer.find('pool') != -1):
-                    metrics_file.write('Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
-                    pool_count+=1
+                    metrics_file.write('Fire Layer %d: Number of Shrink Filters = %d, Kernel Size = %dx%dx%d, Number of Expand Filters = %d, Kernel Size = %dx%d%d\n' % (fire_count+1, self.fire_layers[fire_count][0], self.fire_layers[fire_count][1], self.fire_layers[fire_count][1], self.fire_layers[fire_count][1], 2*self.fire_layers[fire_count][2], 1, 1, 1))
+                    fire_count+=1
+                if (layer.find('max_pool') != -1):
+                    metrics_file.write('Max Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
+                    max_pool_count+=1
+                if (layer.find('avg_pool') != -1):
+                    metrics_file.write('Average Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
+                    avg_pool_count+=1
                 if (layer.find('fc') != -1):
                     metrics_file.write('Fully Connected Layer %d: Number of Nodes = %d\n' % (fc_count+1, self.fc_layers[fc_count]))
                     fc_count+=1
@@ -325,18 +347,18 @@ class OpeNNdd_Model:
             metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs))
             metrics_file.write("\nTotal Training Epochs: " + str(self.epochs))
         else:
-            metrics_file = open(file, "a")
-        if mode.lower() == 'validation' or mode.lower() == 'val':
-            metrics_file.write("\nValidation - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.val_avg_mse_arr[-self.stop_threshold]))
-            metrics_file.write("Validation - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.val_avg_rmse_arr[-self.stop_threshold]))
-            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[-self.stop_threshold]))
+            metrics_file = open(file, "a") #if file already exists, open metrics file for appending
+        if mode.lower() == 'validation' or mode.lower() == 'val': #if user wants to record validation error, write validation error to file
+            metrics_file.write("\nValidation - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.val_avg_mse_arr[self.optimal_epochs]))
+            metrics_file.write("Validation - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.val_avg_rmse_arr[self.optimal_epochs]))
+            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs]))
 
-        if mode.lower() == 'testing' or mode.lower() == 'test':
+        if mode.lower() == 'testing' or mode.lower() == 'test': #if user wants to record test error, write test error to file
             metrics_file.write("\nTesting - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.test_avg_mse_arr))
             metrics_file.write("Testing - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.test_avg_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_avg_mape_arr))
 
-        metrics_file.close()
+        metrics_file.close() #close file
 
     #train the model...includes validation
     def train(self):
@@ -349,37 +371,38 @@ class OpeNNdd_Model:
         saver = tf.train.Saver() #ops to save the model
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
-            print("initialized")
-            stop_count = 0
-            prev_error = float('inf')
-            #prev_error = 0
-            while True: #we are going to fing the number of epochs
+            stop_count = 0 #variable that stores number of epochs model has trained without improving validation error
+            best_error = float('inf') #make initial error an evaluation on validation set prior to any training
+            while True: #we are going to find the number of epochs
                 self.db.shuffle_train_data() #shuffle training data between epochs
-                total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
+                total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0 #error summations used to calculate average error
                 for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(self.epochs+1)):
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
                     train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
-                    rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
+                    rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs) #calculate root mean squared error and mean absolute percentage error
                     total_mse += mse
                     total_rmse += rmse
                     total_mape += mape
+                #append average training errors to respective arrays
+                if (self.epochs > 0):
+                    self.train_avg_mse_arr = np.append(self.train_avg_mse_arr, total_mse / self.db.total_train_steps)
+                    self.train_avg_rmse_arr = np.append(self.train_avg_rmse_arr, total_rmse / self.db.total_train_steps)
+                    self.train_avg_mape_arr = np.append(self.train_avg_mape_arr, total_mape / self.db.total_train_steps)
 
-                #if (self.epochs > 0 and self.epochs % self.stop_threshold == 0):
-                self.train_avg_mse_arr = np.append(self.train_avg_mse_arr, total_mse / self.db.total_train_steps)
-                self.train_avg_rmse_arr = np.append(self.train_avg_rmse_arr, total_rmse / self.db.total_train_steps)
-                self.train_avg_mape_arr = np.append(self.train_avg_mape_arr, total_mape / self.db.total_train_steps)
-                error = self.validate(sess)
+                #get current error on validation set
+                val_error = self.validate(sess)
 
-                if prev_error > error: #right now this early stopping only works for errors that will get less, but not accuracies that will become more
-                    prev_error = error
-                    saver.save(sess, os.path.join(self.model_folder, str(self.id)))
-                    self.optimal_epochs = self.epochs
-                    stop_count = 0
+                if val_error < best_error: #if the error on the validation set is lower than the best error, make the new best error the validation error
+                    best_error = val_error
+                    saver.save(sess, os.path.join(self.model_folder, str(self.id))) #save improved model
+                    self.optimal_epochs = self.epochs #make the optimal number of epochs equal to the epoch with the best error
+                    stop_count = 0 #model has improved, so stop_count is reset to zero
                 else:
-                    stop_count += 1
+                    stop_count += 1 #if model has not improved, increment stop_count by one
 
-                #else: #stop training becuase model did not improve with another pass thru the train set, self.epochs is the appropriate num of epochs..might need to change later
+                #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
                 if (self.epochs > self.min_epochs and stop_count > self.stop_threshold):
+                    #plot training vs validation error and normal validation error
                     self.plot_val_err('mse')
                     self.plot_val_err('mse', 'avg')
                     self.plot_val_err('rmse')
@@ -387,17 +410,19 @@ class OpeNNdd_Model:
                     self.plot_val_err('mape')
                     self.plot_val_err('mape', 'avg')
                     self.record_model_metrics('val')
-                    #saver.save(sess, os.path.join(self.model_folder, str(self.id)))
                     return
 
                 self.epochs += 1
 
+    #validation of model, similar to training but does not use the optimizer, returns mean squared error across the validation set.
     def validate(self, sess):
-        self.db.shuffle_val_data()
+        self.db.shuffle_val_data() #shuffle validation data between epochs
+        #temporary arrays to hold validation error across each batch in an epoch
         mse_arr = np.zeros([self.db.total_val_steps], dtype=float)
         rmse_arr = np.zeros([self.db.total_val_steps], dtype=float)
         mape_arr = np.zeros([self.db.total_val_steps], dtype=float)
         total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
+
         for step in tqdm(range(self.db.total_val_steps), desc = "Validating Model " + str(self.id) + "..."):
             val_ligands, val_labels = self.db.next_val_batch()
             outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels}) #train and return predictions with target values
@@ -407,14 +432,15 @@ class OpeNNdd_Model:
             total_rmse += rmse
             total_mape += mape
 
+        #append temporary arrays to class arrays
         self.val_mse_arr = np.append(self.val_mse_arr, mse_arr)
         self.val_rmse_arr = np.append(self.val_rmse_arr, rmse_arr)
         self.val_mape_arr = np.append(self.val_mape_arr, mape_arr)
 
-
-        self.val_avg_mse_arr = np.append(self.val_avg_mse_arr, total_mse / self.db.total_val_steps)
-        self.val_avg_rmse_arr = np.append(self.val_avg_rmse_arr, total_rmse / self.db.total_val_steps)
-        self.val_avg_mape_arr = np.append(self.val_avg_mape_arr, total_mape / self.db.total_val_steps)
+        if (self.epochs > 0):
+            self.val_avg_mse_arr = np.append(self.val_avg_mse_arr, total_mse / self.db.total_val_steps)
+            self.val_avg_rmse_arr = np.append(self.val_avg_rmse_arr, total_rmse / self.db.total_val_steps)
+            self.val_avg_mape_arr = np.append(self.val_avg_mape_arr, total_mape / self.db.total_val_steps)
 
         return total_mse / self.db.total_val_steps #return the avg error
 
