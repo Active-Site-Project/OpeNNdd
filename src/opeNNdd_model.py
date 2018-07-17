@@ -98,7 +98,7 @@ class OpeNNdd_Model:
         #self.db.total_train_steps = 10
         #self.db.total_val_steps = 10
         #self.db.total_test_steps = 10
-        #self.stop_threshold = 2
+        #self.stop_threshold = -1
 
 
     #3d conv with relu activation
@@ -349,9 +349,10 @@ class OpeNNdd_Model:
         else:
             metrics_file = open(file, "a") #if file already exists, open metrics file for appending
         if mode.lower() == 'validation' or mode.lower() == 'val': #if user wants to record validation error, write validation error to file
-            metrics_file.write("\nValidation - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.val_avg_mse_arr[self.optimal_epochs]))
-            metrics_file.write("Validation - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.val_avg_rmse_arr[self.optimal_epochs]))
-            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs]))
+            print(self.val_avg_mse_arr[self.optimal_epochs+1])
+            metrics_file.write("\nValidation - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
+            metrics_file.write("Validation - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
+            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs+1]))
 
         if mode.lower() == 'testing' or mode.lower() == 'test': #if user wants to record test error, write test error to file
             metrics_file.write("\nTesting - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.test_avg_mse_arr))
@@ -374,6 +375,18 @@ class OpeNNdd_Model:
             stop_count = 0 #variable that stores number of epochs model has trained without improving validation error
             best_error = float('inf') #make initial error an evaluation on validation set prior to any training
             while True: #we are going to find the number of epochs
+                #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
+                if (self.epochs > self.min_epochs-1 and stop_count > self.stop_threshold):
+                    #plot training vs validation error and normal validation error
+                    self.plot_val_err('mse')
+                    self.plot_val_err('mse', 'avg')
+                    self.plot_val_err('rmse')
+                    self.plot_val_err('rmse', 'avg')
+                    self.plot_val_err('mape')
+                    self.plot_val_err('mape', 'avg')
+                    self.record_model_metrics('val')
+                    return
+
                 self.db.shuffle_train_data() #shuffle training data between epochs
                 total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0 #error summations used to calculate average error
                 for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(self.epochs+1)):
@@ -399,18 +412,6 @@ class OpeNNdd_Model:
                     stop_count = 0 #model has improved, so stop_count is reset to zero
                 else:
                     stop_count += 1 #if model has not improved, increment stop_count by one
-
-                #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
-                if (self.epochs > self.min_epochs and stop_count > self.stop_threshold):
-                    #plot training vs validation error and normal validation error
-                    self.plot_val_err('mse')
-                    self.plot_val_err('mse', 'avg')
-                    self.plot_val_err('rmse')
-                    self.plot_val_err('rmse', 'avg')
-                    self.plot_val_err('mape')
-                    self.plot_val_err('mape', 'avg')
-                    self.record_model_metrics('val')
-                    return
 
                 self.epochs += 1
 
