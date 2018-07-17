@@ -344,7 +344,7 @@ class OpeNNdd_Model:
             metrics_file.write("\nLoss Function: " + str(self.loss_function))
             metrics_file.write("\nOptimizer: " + str(self.optimizer))
 
-            metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs))
+            metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs+1))
             metrics_file.write("\nTotal Training Epochs: " + str(self.epochs))
         else:
             metrics_file = open(file, "a") #if file already exists, open metrics file for appending
