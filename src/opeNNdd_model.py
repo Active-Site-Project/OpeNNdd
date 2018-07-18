@@ -36,13 +36,21 @@ class OpeNNdd_Model:
         optimizer = None, #must be a tensorflow optimizing function with a learning rate already... see unit tests example below
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         storage_folder = None, #complete path to an existing directory you would like model data stored
-        gpu_mode = False #booling for whether or not to enable gpu mode
+        gpu_mode = False, #booling for whether or not to enable gpu mode
+        id = None #provide a model id for testing/training an existing model
     ):
+        if (id):
+            assert (os.path.isdir(os.path.join(storage_folder, 'tmp', str(id)))), "Unable to locate model " + str(id) + " in the specified storage folder" + storage_folder
+            self.id = id
+            self.existing_model = True
+        else:
+            self.id = random.randint(100000, 999999) #generate random 6-digit model id
+            self.existing_model = False
+
         assert (len(conv_layers) + len(fire_layers) + len(pool_layers) + len(dropout_layers) + len(fc_layers) == len(ordering)), "Number of layers does not equal number of entries in the ordering list."
         None if os.path.isdir(storage_folder) else os.makedirs(storage_folder) #create dir if need be
         None if os.path.isdir(os.path.join(storage_folder, 'tmp')) else os.makedirs(os.path.join(storage_folder, 'tmp'))
         None if os.path.isdir(os.path.join(storage_folder, 'logs')) else os.makedirs(os.path.join(storage_folder, 'logs'))
-        self.id = random.randint(100000, 999999) #generate random 6-digit model id
         self.storage_folder = storage_folder #storage folder for model and logs
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
@@ -328,10 +336,10 @@ class OpeNNdd_Model:
                     metrics_file.write('Fire Layer %d: Number of Shrink Filters = %d, Kernel Size = %dx%dx%d, Number of Expand Filters = %d, Kernel Size = %dx%d%d\n' % (fire_count+1, self.fire_layers[fire_count][0], self.fire_layers[fire_count][1], self.fire_layers[fire_count][1], self.fire_layers[fire_count][1], 2*self.fire_layers[fire_count][2], 1, 1, 1))
                     fire_count+=1
                 if (layer.find('max_pool') != -1):
-                    metrics_file.write('Max Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
+                    metrics_file.write('Max Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(max_pool_count+1, self.pool_layers[max_pool_count], self.pool_layers[max_pool_count], self.pool_layers[max_pool_count], self.pool_layers[max_pool_count]))
                     max_pool_count+=1
                 if (layer.find('avg_pool') != -1):
-                    metrics_file.write('Average Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(pool_count+1, self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count], self.pool_layers[pool_count]))
+                    metrics_file.write('Average Pooling Layer %d: Pool Size = %dx%dx%d, Stride = %d\n'%(avg_pool_count+1, self.pool_layers[avg_pool_count], self.pool_layers[avg_pool_count], self.pool_layers[avg_pool_count], self.pool_layers[avg_pool_count]))
                     avg_pool_count+=1
                 if (layer.find('fc') != -1):
                     metrics_file.write('Fully Connected Layer %d: Number of Nodes = %d\n' % (fc_count+1, self.fc_layers[fc_count]))
