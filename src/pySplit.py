@@ -11,10 +11,8 @@ import sys
 ##readPath = str(sys.argv[1])  #the user input the path to read sdf files from
 ##storePath = str(sys.argv[2]) #the user inputs path to store the poses into
 def main():
-    #replace with path you will read the sdf files from
-    readPath = str(sys.argv[1])
-    #replace with path you want to store .sdf poses in
-    storePath = str(sys.argv[2])
+    readPath = str(sys.argv[1]) #dir path you will read the sdf files from
+    storePath = str(sys.argv[2]) #dir path you want to store individual .sdf poses in
 
     os.chdir(readPath) #Navigate to the folder containing the sdf files to read
     nameList = []
@@ -36,7 +34,7 @@ def main():
             out = pybel.Outputfile('sdf', 'pose%s.sdf' % i) #creates new .sdf file
             out.write(mol)
             out.close()
-    
+
 
 
 #Run the main fuction

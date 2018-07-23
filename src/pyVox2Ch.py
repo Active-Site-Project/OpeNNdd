@@ -13,12 +13,11 @@ from tqdm import tqdm
 from random import shuffle
 import os
 from math import ceil
+import sys
 
-#Replace path with path of directory containing activeCache.hdf5
-voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
-#Replace path with path of directory containg all ligand poses
-posesPath = '/Users/brycekroencke/Documents/Fellowship/data/poses'
-cloudPath = '/Users/brycekroencke/Documents/OpeNN_DD/ElectronClouds'
+voxelizedDataPath = str(sys.argv[1]) #path of directory containing activeCache.hdf5 and where to store voxelized data
+posesPath = str(sys.argv[2]) #path of directory containg all ligand poses
+cloudPath = str(sys.argv[3]) #path to dir with electron cloud data
 voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid
 
@@ -40,7 +39,7 @@ def main():
     yTrans = h5f['activeCacheTransformations'][1]
     zTrans = h5f['activeCacheTransformations'][2]
     h5f.close()
-    hf = h5py.File('voxelData.h5', 'w')
+    hf = h5py.File('new.h5', 'w')
 
     """
         Lists all files with in the directory of ligand sdf files and shuffles them
@@ -56,7 +55,7 @@ def main():
     desiredSize = 4000
     for i in range(desiredSize):
         desiredFiles.append(fileNames[i])
-        
+
 
     """
         Calculates the training size, validation size, and test size based on

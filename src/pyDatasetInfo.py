@@ -5,13 +5,13 @@ import numpy as np
 import h5py
 import os
 from math import ceil
+import sys
 
-voxelizedDataPath = '/Users/brycekroencke/Documents/Fellowship/data/voxelized'
+voxelizedDataPath = str(sys.argv[1]) #path with voxelized ligand protein dataset
 
 def main():
     #Open and retrieve voxelized data from .hdf5 folder
-    os.chdir(voxelizedDataPath)
-    h5f = h5py.File('new.h5','r')
+    h5f = h5py.File(voxelizedDataPath,'r')
     trainData = h5f['train_ligands'][:]
     trainLabels = h5f['train_labels'][:]
     valData = h5f['val_ligands'][:]
