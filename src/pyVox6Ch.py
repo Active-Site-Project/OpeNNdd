@@ -8,7 +8,7 @@
 """
 import pybel
 import numpy as np
-import h5py
+import tables
 from tqdm import tqdm
 from random import shuffle
 import os
@@ -20,11 +20,6 @@ posesPath = str(sys.argv[2]) #path of directory containg all ligand poses
 cloudPath = str(sys.argv[3]) #path to electron clouds
 voxelRes = .5 #cubic width of voxels
 voxelLWH = 72 #width lenght and height of the voxel grid
-
-
-
-
-
 
 
 class dataInfo:
