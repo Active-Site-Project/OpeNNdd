@@ -249,14 +249,14 @@ class OpeNNdd_Model:
 
         #updates error phrases, data, and units label depending on what error type is passed in
         if err_type.lower() == 'mse':
-            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
+            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(KD)^2'
             if avg_flag:
                 plt.plot(self.val_avg_mse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_mse_arr, 'y-', label='train')
             else:
                 plt.plot(self.val_mse_arr)
         elif err_type.lower() == 'rmse':
-            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
+            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(KD)'
             if avg_flag:
                 plt.plot(self.val_avg_rmse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_rmse_arr, 'y-', label='train')
@@ -292,10 +292,10 @@ class OpeNNdd_Model:
         plt.cla()
         plt.close()
         if err_type.lower() == 'mse':
-            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(kCal/Mol)^2'
+            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(KD)^2'
             plt.plot(self.test_mse_arr)
         elif err_type.lower() == 'rmse':
-            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(kCal/Mol)'
+            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(KD)'
             plt.plot(self.test_rmse_arr)
         elif err_type.lower() == 'mape':
             err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
@@ -359,13 +359,13 @@ class OpeNNdd_Model:
             metrics_file = open(file, "a") #if file already exists, open metrics file for appending
         if mode.lower() == 'validation' or mode.lower() == 'val': #if user wants to record validation error, write validation error to file
             print(self.val_avg_mse_arr[self.optimal_epochs+1])
-            metrics_file.write("\nValidation - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
-            metrics_file.write("Validation - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
+            metrics_file.write("\nValidation - Average Mean Squared Error: %f KD^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
+            metrics_file.write("Validation - Average Root Mean Squared Error: %f KD\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
             metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs+1]))
 
         if mode.lower() == 'testing' or mode.lower() == 'test': #if user wants to record test error, write test error to file
-            metrics_file.write("\nTesting - Average Mean Squared Error: %f kCal^2/Mol^2\n" % (self.test_avg_mse_arr))
-            metrics_file.write("Testing - Average Root Mean Squared Error: %f kCal/Mol\n" % (self.test_avg_rmse_arr))
+            metrics_file.write("\nTesting - Average Mean Squared Error: %f KD^2\n" % (self.test_avg_mse_arr))
+            metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_avg_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_avg_mape_arr))
 
         metrics_file.close() #close file
