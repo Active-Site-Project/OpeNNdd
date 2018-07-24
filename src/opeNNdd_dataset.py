@@ -1,30 +1,9 @@
 import os
-import h5py as h5
+import tables as tb
 import numpy as np
 import random
 import math
 import itertools
-
-def binSearch(arr, target):
-    low = 0
-    high = len(arr)
-    mid = (low + high)//2
-    found = False
-
-    if target < arr[0]:
-        return 0
-                            
-    while (not found):
-        if (target < arr[mid] and target >=arr[mid-1]):
-            found = True
-        elif (target >= arr[mid]):
-            low = mid+1
-            mid = (low+high)//2
-        else:
-            high = mid-1
-            mid = (low+high)//2
-    return mid
-
 
 #class for handling the OpeNNdd dataset.. takes a location to the data and a batch size for initialization
 class OpeNNdd_Dataset:
@@ -38,11 +17,8 @@ class OpeNNdd_Dataset:
     #instantiate with the hdf5 file and the train_batch_size of your choice
     def __init__(self, hdf5_file, batch_size, channels):
         assert os.path.exists(hdf5_file), 'file does not exist' #make sure the path to the specified file exists
-        self.hdf5_file = h5.File(hdf5_file, mode='r') #handle to file
-        self.chunk_names = [name for name in self.hdf5_file['labels']]
-        self.data_chunks = [len(self.hdf5_file['labels'][partition]) for partition in self.hdf5_file['labels']]
-        self.chunk_thresholds = list(itertools.accumulate(self.data_chunks)) 
-        self.total_ligands = self.chunk_thresholds[-1]
+        self.hdf5_file = tb.open_file(hdf5_file, mode='r') #handle to file
+        self.total_ligands = self.hdf5_file.root.labels.shape[0]
         self.total_train_ligands = int(round(self.train_split*self.total_ligands))
         self.total_val_ligands = int(round(self.val_split*self.total_ligands))
         self.total_test_ligands = int(round(self.test_split*self.total_ligands))
@@ -83,11 +59,8 @@ class OpeNNdd_Dataset:
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.train_ligands_processed, self.train_ligands_processed+batch_size):
-            file_index = binSearch(self.chunk_thresholds, self.train_indices[i])
-            filename = str(self.chunk_names[file_index])
-            chunk_index = (self.chunk_thresholds[file_index]-self.chunk_thresholds[file_index-1]-1) if file_index > 0 else self.train_indices[i] 
-            batch_ligands[i-self.train_ligands_processed] = self.hdf5_file['ligands'][filename][chunk_index]
-            batch_energies[i-self.train_ligands_processed] = self.hdf5_file['labels'][filename][chunk_index]
+            batch_ligands[i-self.train_ligands_processed] = self.hdf5_file.root.ligands[self.train_indices[i]]
+            batch_energies[i-self.train_ligands_processed] = self.hdf5_file.root.labels[self.train_indices[i]]
 
 
         if flag:
@@ -110,11 +83,8 @@ class OpeNNdd_Dataset:
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.val_ligands_processed, self.val_ligands_processed+batch_size):
-            file_index = binSearch(self.chunk_thresholds, self.val_indices[i])
-            chunk_index = self.chunk_thresholds[file_index]-self.chunk_thresholds[file_index-1]-1 if file_index > 0 else self.val_indices[i]
-            filename = str(self.chunk_names[file_index])
-            batch_ligands[i-self.val_ligands_processed] = self.hdf5_file['ligands'][filename][chunk_index]
-            batch_energies[i-self.val_ligands_processed] = self.hdf5_file['labels'][filename][chunk_index]
+            batch_ligands[i-self.val_ligands_processed] = self.hdf5_file.root.ligands[self.val_indices[i]]
+            batch_energies[i-self.val_ligands_processed] = self.hdf5_file.root.labels[self.val_indices[i]]
 
 
         if flag:
@@ -136,16 +106,13 @@ class OpeNNdd_Dataset:
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
         for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
-            file_index = binSearch(self.chunk_thresholds, self.test_indices[i])
-            chunk_index = self.chunk_thresholds[file_index]-self.chunk_thresholds[file_index-1]-1 if file_index > 0 else self.test_indices[i]
-            filename = str(self.chunk_names[file_index])
-            batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['ligands'][filename][chunk_index]
-            batch_energies[i-self.test_ligands_processed] = self.hdf5_file['labels'][filename][chunk_index]
+            batch_ligands[i-self.test_ligands_processed] = self.hdf5_file.root.ligands[self.test_indices[i]]
+            batch_energies[i-self.test_ligands_processed] = self.hdf5_file.root.labels[self.test_indices[i]]
 
         if flag:
             self.test_ligands_processed = 0
         else:
             self.test_ligands_processed += batch_size
 
-        #return as np arrays 
+        #return as np arrays
         return batch_ligands, np.reshape(batch_energies, (batch_size,1))
