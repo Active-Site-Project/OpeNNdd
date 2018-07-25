@@ -457,9 +457,9 @@ class OpeNNdd_Model:
     #restore the model and test
     def test(self):
         None if self.network_built else self.build_network() #Dynamically build the network if need be
-        mse_arr = np.empty([self.db.total_val_steps], dtype=float)
-        rmse_arr = np.empty([self.db.total_val_steps], dtype=float)
-        mape_arr = np.empty([self.db.total_val_steps], dtype=float)
+        mse_arr = np.empty([self.db.total_test_steps], dtype=float)
+        rmse_arr = np.empty([self.db.total_test_steps], dtype=float)
+        mape_arr = np.empty([self.db.total_test_steps], dtype=float)
         total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
 
         config = tf.ConfigProto()
