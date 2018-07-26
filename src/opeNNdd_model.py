@@ -69,7 +69,6 @@ class OpeNNdd_Model:
         self.network_built = False #flag to see if we have already built the network
         self.epochs = 0 #number of epochs we have currently completed successfully with increasing validation accuracy
         self.stop_threshold = 10 #number of epochs that the network should check for an improvement in validation accuracy before stopping
-        self.min_epochs = 25 #minimum number of epochs that the network needs to train before early stopping ends training
 
         """ These arrays will hold the average mean squared error, average root mean squared error, and
          average mean absolute percentage error across the training set every epoch (values will be appended to array) """
@@ -385,7 +384,7 @@ class OpeNNdd_Model:
             best_error = float('inf') #make initial error an evaluation on validation set prior to any training
             while True: #we are going to find the number of epochs
                 #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
-                if (self.epochs > self.min_epochs-1 and stop_count > self.stop_threshold):
+                if (stop_count > self.stop_threshold):
                     #plot training vs validation error and normal validation error
                     self.plot_val_err('mse')
                     self.plot_val_err('mse', 'avg')

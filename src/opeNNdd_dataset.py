@@ -23,6 +23,7 @@ class OpeNNdd_Dataset:
         self.total_val_ligands = int(round(self.val_split*self.total_ligands))
         self.total_test_ligands = int(round(self.test_split*self.total_ligands))
         self.ligand_indices = list(range(self.total_ligands)) #[0,total_train_ligands)... will be used later to shuffle the data between epochs and when loading initial batch if necessary
+        np.random.shuffle(self.ligand_indices)
         self.train_indices = self.ligand_indices[0:self.total_train_ligands]
         self.val_indices = self.ligand_indices[self.total_train_ligands:self.total_ligands-self.total_test_ligands]
         self.test_indices = self.ligand_indices[self.total_train_ligands+self.total_val_ligands:]
