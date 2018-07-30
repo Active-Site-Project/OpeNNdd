@@ -55,6 +55,17 @@ class OpeNNdd_Model:
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
         self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNdd dataset
+        #write indices used for the model into a text file in the log folder
+        if not os.path.isdir(self.log_folder):
+            os.makedirs(self.log_folder)
+        indices_file = open(os.path.join(self.log_folder,"indices.txt"), 'w')
+        indices_file.write("Training Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.train_indices]
+        indices_file.write("\n\nValidation Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.val_indices]
+        indices_file.write("\n\nTest Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.test_indices]
+        indices_file.close()
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.fire_layers = fire_layers
