@@ -57,8 +57,23 @@ class OpeNNdd_Model:
         self.storage_folder = storage_folder #storage folder for model and logs
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
+<<<<<<< HEAD
         None if self.existing_model else os.makedirs(self.model_folder)
         self.db = open_data(hdf5_file, batch_size, channels, self.id) #handle for the OpeNNdd dataset
+=======
+        self.db = open_data(hdf5_file, batch_size, channels) #handle for the OpeNNdd dataset
+        #write indices used for the model into a text file in the log folder
+        if not os.path.isdir(self.log_folder):
+            os.makedirs(self.log_folder)
+        indices_file = open(os.path.join(self.log_folder,"indices.txt"), 'w')
+        indices_file.write("Training Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.train_indices]
+        indices_file.write("\n\nValidation Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.val_indices]
+        indices_file.write("\n\nTest Indices:\n")
+        [indices_file.write(str(f)+" ") for f in self.db.test_indices]
+        indices_file.close()
+>>>>>>> b4957518ccd27cde7fff1c6a9c722565cc4873b2
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.fire_layers = fire_layers
@@ -249,14 +264,14 @@ class OpeNNdd_Model:
 
         #updates error phrases, data, and units label depending on what error type is passed in
         if err_type.lower() == 'mse':
-            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(KD)^2'
+            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(pKD)^2'
             if avg_flag:
                 plt.plot(self.val_avg_mse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_mse_arr, 'y-', label='train')
             else:
                 plt.plot(self.val_mse_arr)
         elif err_type.lower() == 'rmse':
-            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(KD)'
+            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(pKD)'
             if avg_flag:
                 plt.plot(self.val_avg_rmse_arr, 'b-', label='val')
                 plt.plot(self.train_avg_rmse_arr, 'y-', label='train')
@@ -291,11 +306,31 @@ class OpeNNdd_Model:
         plt.clf()
         plt.cla()
         plt.close()
+<<<<<<< HEAD
         plt.title('Testing Values')
         plt.xlabel('Predicted Values (KD)')
         plt.ylabel('Actual Values (KD)')
         plt.scatter(self.test_predict,self.test_actual)
         folder = os.path.join(self.log_folder, 'metrics', 'test_graph')
+=======
+        if err_type.lower() == 'mse':
+            err_phrase, err_key, units = 'Mean Squared Error', 'mse', '(pKD)^2'
+            plt.plot(self.test_mse_arr)
+        elif err_type.lower() == 'rmse':
+            err_phrase, err_key, units = 'Root Mean Squared Error', 'rmse', '(pKD)'
+            plt.plot(self.test_rmse_arr)
+        elif err_type.lower() == 'mape':
+            err_phrase, err_key, units = 'Mean Absolute Percentage Error', 'mape', '(%)'
+            plt.plot(self.test_mape_arr)
+        else:
+            return
+
+        plt.xlim(xmin=1)
+        plt.title('Testing - ' + err_phrase)
+        plt.xlabel('Number of Testing Batches')
+        plt.ylabel(err_phrase + ' ' + units)
+        folder = os.path.join(self.log_folder, 'metrics', 'test', err_key)
+>>>>>>> b4957518ccd27cde7fff1c6a9c722565cc4873b2
         if not os.path.isdir(folder):
             os.makedirs(folder)
         plt.savefig(os.path.join(folder, 'test_err.png'))
@@ -346,6 +381,7 @@ class OpeNNdd_Model:
         else:
             metrics_file = open(file, "a") #if file already exists, open metrics file for appending
         if mode.lower() == 'validation' or mode.lower() == 'val': #if user wants to record validation error, write validation error to file
+<<<<<<< HEAD
             metrics_file.write("\nValidation - Average Mean Squared Error: %f KD^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
             metrics_file.write("Validation - Average Root Mean Squared Error: %f KD\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
             metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs+1]))
@@ -355,6 +391,18 @@ class OpeNNdd_Model:
             metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_mape_arr))
             metrics_file.write("\nTesting - R^2: %f"%(self.test_r_squared))
+=======
+            print(self.val_avg_mse_arr[self.optimal_epochs+1])
+            metrics_file.write("\nValidation - Average Mean Squared Error: %f pKD^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
+            metrics_file.write("Validation - Average Root Mean Squared Error: %f pKD\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
+            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs+1]))
+
+        if mode.lower() == 'testing' or mode.lower() == 'test': #if user wants to record test error, write test error to file
+            metrics_file.write("\nTesting - Average Mean Squared Error: %f pKD^2\n" % (self.test_avg_mse_arr))
+            metrics_file.write("Testing - Average Root Mean Squared Error: %f pKD\n" % (self.test_avg_rmse_arr))
+            metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_avg_mape_arr))
+
+>>>>>>> b4957518ccd27cde7fff1c6a9c722565cc4873b2
         metrics_file.close() #close file
 
     #train the model...includes validation
