@@ -2,6 +2,7 @@ import os
 import tables as tb
 import numpy as np
 import random
+from datetime import datetime
 import math
 import itertools
 
@@ -15,7 +16,7 @@ class OpeNNdd_Dataset:
     test_split = .20
 
     #instantiate with the hdf5 file and the train_batch_size of your choice
-    def __init__(self, hdf5_file, batch_size, channels):
+    def __init__(self, hdf5_file, batch_size, channels,id):
         assert os.path.exists(hdf5_file), 'file does not exist' #make sure the path to the specified file exists
         self.hdf5_file = tb.open_file(hdf5_file, mode='r') #handle to file
         self.total_ligands = self.hdf5_file.root.labels.shape[0]
@@ -23,7 +24,9 @@ class OpeNNdd_Dataset:
         self.total_val_ligands = int(round(self.val_split*self.total_ligands))
         self.total_test_ligands = int(round(self.test_split*self.total_ligands))
         self.ligand_indices = list(range(self.total_ligands)) #[0,total_train_ligands)... will be used later to shuffle the data between epochs and when loading initial batch if necessary
+        np.random.seed(id)
         np.random.shuffle(self.ligand_indices)
+        random.seed(datetime.now())
         self.train_indices = self.ligand_indices[0:self.total_train_ligands]
         self.val_indices = self.ligand_indices[self.total_train_ligands:self.total_ligands-self.total_test_ligands]
         self.test_indices = self.ligand_indices[self.total_train_ligands+self.total_val_ligands:]
@@ -106,9 +109,11 @@ class OpeNNdd_Dataset:
 
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
+
         for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
             batch_ligands[i-self.test_ligands_processed] = self.hdf5_file.root.ligands[self.test_indices[i]]
             batch_energies[i-self.test_ligands_processed] = self.hdf5_file.root.labels[self.test_indices[i]]
+
 
         if flag:
             self.test_ligands_processed = 0
