@@ -11,9 +11,9 @@ class OpeNNdd_Dataset:
     """data stats"""
     classes = 1 #num of classifications will be one since we want continuous output
     grid_dim = 72
-    train_split = .70
-    val_split = .10
-    test_split = .20
+    train_split = .7
+    val_split = .1
+    test_split = .2
 
     #instantiate with the hdf5 file and the train_batch_size of your choice
     def __init__(self, hdf5_file, batch_size, channels,id):

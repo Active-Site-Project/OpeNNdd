@@ -118,29 +118,29 @@ class OpeNNdd_Model:
         return out
 
     #3d fire layer with relu activation
-    def fire_3d(self, inputs, filters, expand_filters, kernel_size, name=None):
+    def fire_3d(self, inputs, squeeze1filters, expand1filters, expand3filters, name=None):
         if (name):
             shrink_name = name + '_shrink'
-            expand_name1 = name + '_expand1'
-            expand_name2 = name + 'expand2'
+            expand_name1 = name + '_expand1x1x1'
+            expand_name2 = name + 'expand3x3x3'
         else:
             shrink_name = None
             expand_name1 = None
             expand_name2 = None
 
-        out = tf.layers.conv3d(inputs, filters=filters, kernel_size=kernel_size,
+        out = tf.layers.conv3d(inputs, filters=squeeze1filters, kernel_size=(1,1,1),
                                  padding='same', activation=tf.nn.relu,
                                  name=shrink_name)
 
-        expand1 = tf.layers.conv3d(out, filters=expand_filters, kernel_size= (1,1,1),
+        expand1x1x1 = tf.layers.conv3d(out, filters=expand1filters, kernel_size= (1,1,1),
                                  padding='same', activation=tf.nn.relu,
                                  name=expand_name1)
 
-        expand2 = tf.layers.conv3d(inputs, filters=expand_filters, kernel_size= (1,1,1),
+        expand3x3x3 = tf.layers.conv3d(inputs, filters=expand3filters, kernel_size= (3,3,3),
                                  padding='same', activation=tf.nn.relu,
                                  name=expand_name2)
 
-        out = tf.concat([expand1, expand2], 4, name=name)
+        out = tf.concat([expand1x1x1, expand3x3x3], 4, name=name)
 
         return out
 
@@ -194,8 +194,7 @@ class OpeNNdd_Model:
                 self.network.update({'dropout'+str(d_layer): tf.nn.dropout(self.network[next(reversed(self.network))], self.dropout_layers[d_layer])})
                 d_layer += 1
             elif command == 'f': #fire layer
-                shape = (self.fire_layers[f_layer][1], self.fire_layers[f_layer][1], self.fire_layers[f_layer][1]) #convert dim provided into a tuple
-                self.network.update({'fire'+str(f_layer): self.fire_3d(self.network[next(reversed(self.network))], self.fire_layers[f_layer][0], self.fire_layers[f_layer][2], shape, 'fire'+str(f_layer))})
+                self.network.update({'fire'+str(f_layer): self.fire_3d(self.network[next(reversed(self.network))], self.fire_layers[f_layer][0], self.fire_layers[f_layer][1], self.fire_layers[f_layer][2], 'fire'+str(f_layer))})
                 f_layer += 1
             elif command == 'a': #average pooling
                 shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
