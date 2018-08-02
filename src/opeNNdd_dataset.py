@@ -109,10 +109,15 @@ class OpeNNdd_Dataset:
 
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
+<<<<<<< Updated upstream
 
+=======
+
+>>>>>>> Stashed changes
         for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
             batch_ligands[i-self.test_ligands_processed] = self.hdf5_file.root.ligands[self.test_indices[i]]
             batch_energies[i-self.test_ligands_processed] = self.hdf5_file.root.labels[self.test_indices[i]]
+
 
 
         if flag:

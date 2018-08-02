@@ -357,7 +357,7 @@ class OpeNNdd_Model:
             metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_mape_arr))
             metrics_file.write("\nTesting - R^2: %f"%(self.test_r_squared))
-     
+
         metrics_file.close() #close file
 
     #train the model...includes validation
