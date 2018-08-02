@@ -38,6 +38,7 @@ class OpeNNdd_Model:
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         storage_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False, #booling for whether or not to enable gpu mode
+        mode = 'ru' # mode for database structure
         id = None #provide a model id for testing/training an existing model
     ):
         if (id):
@@ -58,7 +59,7 @@ class OpeNNdd_Model:
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
         None if self.existing_model else os.makedirs(self.model_folder)
-        self.db = open_data(hdf5_file, batch_size, channels, self.id) #handle for the OpeNNdd dataset
+        self.db = open_data(hdf5_file, batch_size, channels, mode, self.id) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.fire_layers = fire_layers
