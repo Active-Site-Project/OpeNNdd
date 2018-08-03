@@ -1,5 +1,5 @@
 import os
-import tables as tb
+import h5py as h5
 import numpy as np
 import random
 from datetime import datetime
@@ -14,15 +14,15 @@ class OpeNNdd_Dataset:
     grid_dim = 72
 
     #instantiate with the hdf5 file and the train_batch_size of your choice
-    def __init__(self, hdf5_file, batch_size, channels, mode='ru', id):
+    def __init__(self, hdf5_file, batch_size, channels, mode='ru', id=datetime.now()):
         assert os.path.exists(hdf5_file), 'file does not exist' #make sure the path to the specified file exists
-        self.hdf5_file = tb.open_file(hdf5_file, mode='r') #handle to file
+        self.hdf5_file = h5.File(hdf5_file, mode='r') #handle to file
         self.mode = mode
         if self.mode == 'ru' or self.mode == 'l':
             self.train_split = .7
             self.val_split = .1
-            self.test_split - .2
-            self.total_ligands = self.hdf5_file.root.labels.shape[0]
+            self.test_split = .2
+            self.total_ligands = self.hdf5_file['labels'].shape[0]
             self.total_train_ligands = int(round(self.train_split*self.total_ligands))
             self.total_val_ligands = int(round(self.val_split*self.total_ligands))
             self.total_test_ligands = int(round(self.test_split*self.total_ligands))
@@ -33,10 +33,16 @@ class OpeNNdd_Dataset:
             self.train_indices = self.ligand_indices[0:self.total_train_ligands]
             self.val_indices = self.ligand_indices[self.total_train_ligands:self.total_ligands-self.total_test_ligands]
             self.test_indices = self.ligand_indices[self.total_train_ligands+self.total_val_ligands:]
-        if self.mode == 'su':
-            self.total_train_ligands = self.hdf5_file.root.train_labels.shape[0]
-            self.total_val_ligands = self.hdf5_file.root.val_labels.shape[0]
-            self.total_test_ligands = self.hdf5_file.root.val_labels.shape[0]
+        elif self.mode == 'su':
+            self.total_train_ligands = self.hdf5_file['train_labels'].shape[0]
+            self.total_val_ligands = self.hdf5_file['val_labels'].shape[0]
+            self.total_test_ligands = self.hdf5_file['test_labels'].shape[0]
+            self.train_indices = list(range(self.total_train_ligands))
+            self.val_indices = list(range(self.total_val_ligands))
+            self.test_indices = list(range(self.total_test_ligands))
+            random.shuffle(self.train_indices)
+            random.shuffle(self.val_indices)
+            random.shuffle(self.test_indices)
         else:
             print("Invalid Mode. Exiting")
             exit()
@@ -74,11 +80,11 @@ class OpeNNdd_Dataset:
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
 
-        if self.mode = 'ru':
+        if self.mode == 'ru':
             for i in range(self.train_ligands_processed, self.train_ligands_processed+batch_size):
                 batch_ligands[i-self.train_ligands_processed] = self.hdf5_file['ligands'][self.train_indices[i]]
                 batch_energies[i-self.train_ligands_processed] = self.hdf5_file['labels'][self.train_indices[i]]
-        elif self.mode = 'su':
+        elif self.mode == 'su':
             for i in range(self.train_ligands_processed, self.train_ligands_processed+batch_size):
                 batch_ligands[i-self.train_ligands_processed] = self.hdf5_file['train_ligands'][self.train_indices[i]]
                 batch_energies[i-self.train_ligands_processed] = self.hdf5_file['train_labels'][self.train_indices[i]]
@@ -109,11 +115,11 @@ class OpeNNdd_Dataset:
 
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
-        if self.mode = 'ru':
+        if self.mode == 'ru':
             for i in range(self.val_ligands_processed, self.val_ligands_processed+batch_size):
                 batch_ligands[i-self.val_ligands_processed] = self.hdf5_file['ligands'][self.val_indices[i]]
                 batch_energies[i-self.val_ligands_processed] = self.hdf5_file['labels'][self.val_indices[i]]
-        elif self.mode = 'su':
+        elif self.mode == 'su':
             for i in range(self.val_ligands_processed, self.val_ligands_processed+batch_size):
                 batch_ligands[i-self.val_ligands_processed] = self.hdf5_file['val_ligands'][self.val_indices[i]]
                 batch_energies[i-self.val_ligands_processed] = self.hdf5_file['val_labels'][self.val_indices[i]]
@@ -142,17 +148,17 @@ class OpeNNdd_Dataset:
 
         batch_ligands = np.zeros([batch_size, self.grid_dim, self.grid_dim, self.grid_dim, self.channels], dtype=np.float32)
         batch_energies = np.zeros([batch_size], dtype=np.float32)
-
-        if self.mode = 'ru':
+        batch_filenames = []
+        if self.mode == 'ru':
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['ligands'][self.test_indices[i]]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['labels'][self.test_indices[i]]
-                batch_filenames[i-self.test_ligands_processed] = self.hdf5_file['filenames'][self.test_indices[i]]
-        elif self.mode = 'su':
+                batch_filenames.append(self.hdf5_file['filenames'][self.test_indices[i]])
+        elif self.mode == 'su':
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['test_ligands'][self.test_indices[i]]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['test_labels'][self.test_indices[i]]
-                batch_filenames[i-self.test_ligands_processed] = self.hdf5_file['test_filenames'][self.test_indices[i]]
+                batch_filenames.append(self.hdf5_file['test_filenames'][self.test_indices[i]])
         else:
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 file_index = binSearch(self.chunk_thresholds, self.test_indices[i])
@@ -160,7 +166,7 @@ class OpeNNdd_Dataset:
                 chunk_index = (self.chunk_thresholds[file_index]-self.chunk_thresholds[file_index-1]-1) if file_index > 0 else self.test_indices[i]
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['ligands'][filename][chunk_index]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['labels'][filename][chunk_index]
-                batch_filenames[i-self.test_ligands_processed] = self.hdf5_file['filenames'][filename][chunk_index]
+                batch_filenames.append(self.hdf5_file['filenames'][filename][chunk_index])
 
 
         if flag:

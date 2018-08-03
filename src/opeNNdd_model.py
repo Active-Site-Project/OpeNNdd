@@ -38,7 +38,7 @@ class OpeNNdd_Model:
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         storage_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False, #booling for whether or not to enable gpu mode
-        mode = 'ru' # mode for database structure
+        mode = 'ru', # mode for database structure
         id = None #provide a model id for testing/training an existing model
     ):
         if (id):
@@ -342,16 +342,14 @@ class OpeNNdd_Model:
             metrics_file.write("\nLoss Function: " + str(self.loss_function))
             metrics_file.write("\nOptimizer: " + str(self.optimizer))
 
-            if (not self.existing_model):
-                metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs+1))
-                metrics_file.write("\nTotal Training Epochs: " + str(self.epochs))
         else:
             metrics_file = open(file, "a") #if file already exists, open metrics file for appending
         if mode.lower() == 'validation' or mode.lower() == 'val': #if user wants to record validation error, write validation error to file
-
-            metrics_file.write("\nValidation - Average Mean Squared Error: %f KD^2\n" % (self.val_avg_mse_arr[self.optimal_epochs+1]))
-            metrics_file.write("Validation - Average Root Mean Squared Error: %f KD\n" % (self.val_avg_rmse_arr[self.optimal_epochs+1]))
-            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs+1]))
+            metrics_file.write("\n\nTraining Epochs for Saved Model: " + str(self.optimal_epochs+1))
+            metrics_file.write("\nTotal Training Epochs: " + str(self.epochs+1))
+            metrics_file.write("\nValidation - Average Mean Squared Error: %f KD^2\n" % (self.val_avg_mse_arr[self.optimal_epochs]))
+            metrics_file.write("Validation - Average Root Mean Squared Error: %f KD\n" % (self.val_avg_rmse_arr[self.optimal_epochs]))
+            metrics_file.write("Validation - Average Mean Absolute Percentage Error:  {:0.2f}%\n".format(self.val_avg_mape_arr[self.optimal_epochs]))
 
         if mode.lower() == 'testing' or mode.lower() == 'test': #if user wants to record test error, write test error to file
             metrics_file.write("\nTesting - Average Mean Squared Error: %f KD^2\n" % (self.test_mse_arr))
@@ -390,6 +388,7 @@ class OpeNNdd_Model:
                 total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0 #error summations used to calculate average error
                 for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(int(self.epochs+1))):
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
+                    #print(train_labels.shape[0])
                     train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
                     rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs) #calculate root mean squared error and mean absolute percentage error
                     total_mse += mse
@@ -469,7 +468,7 @@ class OpeNNdd_Model:
             saver.restore(sess, os.path.join(self.model_folder, str(self.id)))
             self.db.shuffle_test_data() #shuffle training data between epochs
             for step in tqdm(range(self.db.total_test_steps), desc = "Testing Model " + str(self.id) + "..."):
-                test_ligands, test_labels = self.db.next_test_batch() #get next training batch
+                test_ligands, test_labels, _  = self.db.next_test_batch() #get next training batch
                 outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
                 mse_arr[step], rmse_arr[step], mape_arr[step] = mse, rmse, mape
