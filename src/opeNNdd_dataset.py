@@ -153,12 +153,10 @@ class OpeNNdd_Dataset:
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['ligands'][self.test_indices[i]]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['labels'][self.test_indices[i]]
-                batch_filenames.append(self.hdf5_file['filenames'][self.test_indices[i]])
         elif self.mode == 'su':
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['test_ligands'][self.test_indices[i]]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['test_labels'][self.test_indices[i]]
-                batch_filenames.append(self.hdf5_file['test_filenames'][self.test_indices[i]])
         else:
             for i in range(self.test_ligands_processed, self.test_ligands_processed+batch_size):
                 file_index = binSearch(self.chunk_thresholds, self.test_indices[i])
@@ -166,7 +164,6 @@ class OpeNNdd_Dataset:
                 chunk_index = (self.chunk_thresholds[file_index]-self.chunk_thresholds[file_index-1]-1) if file_index > 0 else self.test_indices[i]
                 batch_ligands[i-self.test_ligands_processed] = self.hdf5_file['ligands'][filename][chunk_index]
                 batch_energies[i-self.test_ligands_processed] = self.hdf5_file['labels'][filename][chunk_index]
-                batch_filenames.append(self.hdf5_file['filenames'][filename][chunk_index])
 
 
         if flag:
@@ -175,4 +172,4 @@ class OpeNNdd_Dataset:
             self.test_ligands_processed += batch_size
 
         #return as np arrays
-        return batch_ligands, np.reshape(batch_energies, (batch_size,1)), batch_filenames
+        return batch_ligands, np.reshape(batch_energies, (batch_size,1))
