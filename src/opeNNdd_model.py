@@ -94,6 +94,7 @@ class OpeNNdd_Model:
 
         """ These arrays will hold the mean squared error,  root mean squared error, and mean absolute percentage error
         across the testing set every batch (values will be appended to array) """
+        self.test_filenames = []
         self.test_predict = np.empty([0], dtype=float)
         self.test_actual = np.empty([0], dtype=float)
         self.test_r_squared= 0
@@ -356,6 +357,12 @@ class OpeNNdd_Model:
             metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_mape_arr))
             metrics_file.write("\nTesting - R^2: %f"%(self.test_r_squared))
+            test_file = open(os.path.join(folder, 'test_values_'+str(self.id)+'.txt'), 'w')
+            for i in range(self.db.total_test_ligands):
+                test_file.write(str(self.test_filenames[i])[4:-2]+'\n')
+                test_file.write('Actual: '+str(self.test_actual[i])[1:-1]+'\n')
+                test_file.write('Predicted: '+str(self.test_predict[i])[1:-1]+'\n\n')
+            test_file.close()
 
         metrics_file.close() #close file
 
@@ -370,7 +377,10 @@ class OpeNNdd_Model:
         with tf.Session(config=config) as sess:
             sess.run(tf.global_variables_initializer()) #initialize tf variables
             stop_count = 0 #variable that stores number of epochs model has trained without improving validation error
-            best_error = float('inf') #make initial error an evaluation on validation set prior to any training
+            if (self.existing_model):
+                best_error = self.validate(sess)
+            else:
+                best_error = float('inf') #make initial error an evaluation on validation set prior to any training
             while True: #we are going to find the number of epochs
                 #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
                 if (stop_count > self.stop_threshold):
@@ -386,7 +396,7 @@ class OpeNNdd_Model:
 
                 self.db.shuffle_train_data() #shuffle training data between epochs
                 total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0 #error summations used to calculate average error
-                for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(int(self.epochs+1))):
+                for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(int(self.epochs+1))+" - Stop Count " + str(stop_count)):
                     train_ligands, train_labels = self.db.next_train_batch() #get next training batch
                     #print(train_labels.shape[0])
                     train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
@@ -413,7 +423,7 @@ class OpeNNdd_Model:
                         self.plot_val_err('rmse', 'avg')
                         self.plot_val_err('mape')
                         self.plot_val_err('mape', 'avg')
-                    self.optimal_epochs = self.epochs #make the optimal number of epochs equal to the epoch with the best error
+                    self.optimal_epochs = int(self.epochs) #make the optimal number of epochs equal to the epoch with the best error
                     stop_count = 0 #model has improved, so stop_count is reset to zero
                 else:
                     stop_count += 1 #if model has not improved, increment stop_count by one
@@ -468,17 +478,19 @@ class OpeNNdd_Model:
             saver.restore(sess, os.path.join(self.model_folder, str(self.id)))
             self.db.shuffle_test_data() #shuffle training data between epochs
             for step in tqdm(range(self.db.total_test_steps), desc = "Testing Model " + str(self.id) + "..."):
-                test_ligands, test_labels, _  = self.db.next_test_batch() #get next training batch
+                test_ligands, test_labels, test_filenames  = self.db.next_test_batch() #get next training batch
                 outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
                 mse_arr[step], rmse_arr[step], mape_arr[step] = mse, rmse, mape
+
                 total_mse += mse
                 total_rmse += rmse
                 total_mape += mape
+                for filename in test_filenames:
+                    self.test_filenames.append(filename)
                 self.test_actual = np.append(self.test_actual,targets)
                 self.test_predict = np.append(self.test_predict,outputs)
 
-            predict, target = outputs, targets
             x,y = self.test_predict, self.test_actual
             x_len = self.test_predict.shape[0]
             y_len = self.test_actual.shape[0]
