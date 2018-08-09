@@ -26,7 +26,6 @@ class OpeNNdd_Model:
     def __init__(self,
         hdf5_file = None, #complete file path to the hdf5 file where the data is stored
         batch_size = None, #number of images to use for train, val and test batches
-        channels = None, #num of channel for each image
         conv_layers = None, #must provide a shape that each dim will specify features per layer.. ex. [32,64,64] -> 3 layers, filters of 32, 64, and 64 features
         conv_kernels = None, #must provide a shape that will specify kernel dim per layer.. ex. [3,5,5] -> 3x3x3 5x5x5 and 5x5x5 filters.. must have same num of dimenions as conv_layers
         fire_layers = None, #must be a list of lists where the first element in sublist is number of shrink filters, second element is kernel size for shrink conv, and third element is number of expand filters
@@ -38,7 +37,7 @@ class OpeNNdd_Model:
         ordering = None, #must be a string representing ordering of layers by the standard of this class... ex. "cpcpff" -> conv, max_pool, conv1, max_pool, fully connected, fully connected.. and the num of characters must match the sum of all of the dimensions provided in the layers variables
         storage_folder = None, #complete path to an existing directory you would like model data stored
         gpu_mode = False, #booling for whether or not to enable gpu mode
-        mode = 'ru', # mode for database structure
+        db_mode = 'ru', # mode for database structure
         id = None #provide a model id for testing/training an existing model
     ):
         if (id):
@@ -59,7 +58,7 @@ class OpeNNdd_Model:
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
         None if self.existing_model else os.makedirs(self.model_folder)
-        self.db = open_data(hdf5_file, batch_size, channels, mode, self.id) #handle for the OpeNNdd dataset
+        self.db = open_data(hdf5_file, batch_size, db_mode, self.id) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
         self.fire_layers = fire_layers
@@ -177,8 +176,8 @@ class OpeNNdd_Model:
 
     #dynamically build the network
     def build_network(self):
-        self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, open_data.classes])}) #start a dictionary with first element as placeholder for the labels
-        self.network.update({'inputs': tf.placeholder(tf.float32, [None, open_data.grid_dim, open_data.grid_dim, open_data.grid_dim, self.db.channels])}) #append placeholder for the inputs
+        self.network = OrderedDict({'labels': tf.placeholder(tf.float32, [None, self.db.classes])}) #start a dictionary with first element as placeholder for the labels
+        self.network.update({'inputs': tf.placeholder(tf.float32, [None, self.db.grid_dim, self.db.grid_dim, self.db.grid_dim, self.db.channels])}) #append placeholder for the inputs
         c_layer, p_layer, d_layer, f_layer, h_layer, a_layer = 0, 0, 0, 0, 0, 0 #counters for which of each type of layer we are on
 
         #append layers as desired
@@ -202,20 +201,20 @@ class OpeNNdd_Model:
                 shape = (self.pool_layers[a_layer], self.pool_layers[a_layer], self.pool_layers[a_layer])
                 self.network.update({'avg_pool'+str(a_layer): self.max_pool3d(self.network[next(reversed(self.network))], shape, 'avg_pool'+str(a_layer))})
             elif command == 'h': #fully connected
-                if h_layer == self.ordering.count('h') - 1: #we are appending the last fully connected layer.. so use dense no relu
-                    if self.flattened:
-                        self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'logits')})
-                    else:
-                        self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'logits')})
-                        self.flattened = True
-                else: #dense with relu
-                    if self.flattened:
-                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'fc'+str(h_layer))})
-                    else:
-                        self.network.update({'fc'+str(h_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'fc'+str(h_layer))})
-                        self.flattened = True
+                if self.flattened:
+                    self.network.update({'fc'+str(h_layer): self.dense_relu(self.network[next(reversed(self.network))], self.fc_layers[h_layer], 'fc'+str(h_layer))})
+                else:
+                    self.network.update({'fc'+str(h_layer): self.dense_relu(self.flatten(self.network[next(reversed(self.network))]), self.fc_layers[h_layer], 'fc'+str(h_layer))})
+                    self.flattened = True
                 h_layer += 1
 
+        #Append Final Layer 
+        if self.flattened:
+            self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.db.classes, 'logits')})
+        else:
+            self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.db.classes, 'logits')})
+            self.flattened = True
+        
         self.network_built = True
 
         #append loss function and then optimizer
@@ -357,13 +356,14 @@ class OpeNNdd_Model:
             metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_mape_arr))
             metrics_file.write("\nTesting - R^2: %f"%(self.test_r_squared))
+            
             test_file = open(os.path.join(folder, 'test_values_'+str(self.id)+'.txt'), 'w')
             for i in range(self.db.total_test_ligands):
                 test_file.write(str(self.test_filenames[i])[4:-2]+'\n')
                 test_file.write('Actual: '+str(self.test_actual[i])[1:-1]+'\n')
                 test_file.write('Predicted: '+str(self.test_predict[i])[1:-1]+'\n\n')
             test_file.close()
-
+            
         metrics_file.close() #close file
 
     #train the model...includes validation
@@ -397,7 +397,7 @@ class OpeNNdd_Model:
                 self.db.shuffle_train_data() #shuffle training data between epochs
                 total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0 #error summations used to calculate average error
                 for step in tqdm(range(self.db.total_train_steps), desc = "Training Model " + str(self.id) + " - Epoch " + str(int(self.epochs+1))+" - Stop Count " + str(stop_count)):
-                    train_ligands, train_labels = self.db.next_train_batch() #get next training batch
+                    train_ligands, train_labels, _ = self.db.next_train_batch() #get next training batch
                     #print(train_labels.shape[0])
                     train_op, mse, targets, outputs = sess.run([self.network['optimizer'], self.network['loss'], self.network['labels'], self.network['logits']], feed_dict={self.network['inputs']: train_ligands, self.network['labels']: train_labels}) #train and return predictions with target values
                     rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs) #calculate root mean squared error and mean absolute percentage error
@@ -440,7 +440,7 @@ class OpeNNdd_Model:
         total_mse, total_rmse, total_mape = 0.0, 0.0, 0.0
 
         for step in tqdm(range(self.db.total_val_steps), desc = "Validating Model " + str(self.id) + "..."):
-            val_ligands, val_labels = self.db.next_val_batch()
+            val_ligands, val_labels, _ = self.db.next_val_batch()
             outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: val_ligands, self.network['labels']: val_labels}) #train and return predictions with target values
             rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
             mse_arr[step], rmse_arr[step], mape_arr[step] = mse, rmse, mape
@@ -478,7 +478,7 @@ class OpeNNdd_Model:
             saver.restore(sess, os.path.join(self.model_folder, str(self.id)))
             self.db.shuffle_test_data() #shuffle training data between epochs
             for step in tqdm(range(self.db.total_test_steps), desc = "Testing Model " + str(self.id) + "..."):
-                test_ligands, test_labels, test_filenames  = self.db.next_test_batch() #get next training batch
+                test_ligands, test_labels, test_filenames = self.db.next_test_batch() #get next training batch
                 outputs, targets, mse = sess.run([self.network['logits'], self.network['labels'], self.network['loss']], feed_dict={self.network['inputs']: test_ligands, self.network['labels']: test_labels}) #train and return predictions with target values
                 rmse, mape = math.sqrt(mse), self.mean_absolute_percentage_error(targets, outputs)
                 mse_arr[step], rmse_arr[step], mape_arr[step] = mse, rmse, mape
@@ -486,8 +486,10 @@ class OpeNNdd_Model:
                 total_mse += mse
                 total_rmse += rmse
                 total_mape += mape
+                
                 for filename in test_filenames:
                     self.test_filenames.append(filename)
+                    
                 self.test_actual = np.append(self.test_actual,targets)
                 self.test_predict = np.append(self.test_predict,outputs)
 
@@ -537,3 +539,4 @@ if __name__ == '__main__':
 
     model.train() #train the model
     model.test() #test the model and get the error
+
