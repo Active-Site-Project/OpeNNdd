@@ -57,7 +57,7 @@ class OpeNNdd_Model:
         self.storage_folder = storage_folder #storage folder for model and logs
         self.model_folder = os.path.join(storage_folder, 'tmp', str(self.id))
         self.log_folder = os.path.join(storage_folder, 'logs', str(self.id))
-        None if self.existing_model else os.makedirs(self.model_folder)
+        #None if self.existing_model else os.makedirs(self.model_folder)
         self.db = open_data(hdf5_file, batch_size, db_mode, self.id) #handle for the OpeNNdd dataset
         self.conv_layers = conv_layers
         self.conv_kernels = conv_kernels
@@ -381,6 +381,7 @@ class OpeNNdd_Model:
                 best_error = self.validate(sess)
             else:
                 best_error = float('inf') #make initial error an evaluation on validation set prior to any training
+                os.makedirs(self.model_folder)
             while True: #we are going to find the number of epochs
                 #if the number of training epochs is greater than the minimum number specified, and the model has not improved after a specified number of iterations, stop training
                 if (stop_count > self.stop_threshold):
