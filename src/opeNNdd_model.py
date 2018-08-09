@@ -518,23 +518,23 @@ class OpeNNdd_Model:
 
 if __name__ == '__main__':
     #Constants
-    BATCH_SIZE = 6 #images per batch
+    BATCH_SIZE = 25 #images per batch
     CHANNELS = 6
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(sys.argv[2])  #path to where we would like our model stored
 
     if str(sys.argv[3]).lower() == "gpu": #argument for whether or not 'cpu' or 'gpu' mode
-        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,       #sample gpu model that should fit on 3gb gpu
+        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE,       #sample gpu model that should fit on 3gb gpu
                                 [32,64], [5,5], [], [2,2], [0.4],
-                                [1024,1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDHH',
-                                MODEL1_STORAGE_DIR, True)
+                                [1024], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDH',
+                                MODEL1_STORAGE_DIR, gpu_mode=True, db_mode='ru')
     else:
-        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE, CHANNELS,        #sample model to run on cpu
+        model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE,        #sample model to run on cpu
                                 [32,64], [5,5], [], [2,2], [0.4],
-                                [1024, 1], tf.losses.mean_squared_error,
-                                tf.train.AdamOptimizer(1e-4), 'CPCPDHH',
-                                MODEL1_STORAGE_DIR, False)
+                                [1024], tf.losses.mean_squared_error,
+                                tf.train.AdamOptimizer(1e-4), 'CPCPDH',
+                                MODEL1_STORAGE_DIR, gpu_mode=False, db_mode='ru')
 
 
     model.train() #train the model
