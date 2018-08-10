@@ -23,8 +23,7 @@ cloudPath = str(sys.argv[3])        #Path to DIRECTORY with other cached clouds 
 
 num_pts = int(radius ** 2 * 4 * pi * 4) #makes a consistant number of electrons per radius
 indices = arange(0, num_pts, dtype=float) + 0.5
-path = "ElectronClouds/" #sets the save path into the ElectronClouds directory.
-os.chdir(path)
+os.chdir(cloudPath)
 outFile = open(filename, 'w+')
 xv = []
 yv = []
