@@ -2,19 +2,28 @@
     Creates a .txt file containg the x,y,z coordinates of electron values that
     have been distributed around a centered aroud the point (0,0,0). The user
     must include the Van Der Waals radius in Angstroms and the element symbol
-    as arguments. Text file saves in ElectronClouds directory
+    as arguments. Text file saves in ElectronClouds directoryself.
+
+    SYSTEM ARGUMENTS:
+    1) Desired radius in Angstrom
+    2) Desired output file name (do not include .txt)
+    3) Path to DIRECTORY containing the other electron clouds
 """
 from numpy import pi, cos, sin, arccos, arange
 from math import ceil
 import os
 import sys
 
-radius = float(sys.argv[1])         #sets Van Der Waals radius in Angstroms
-filename = str(sys.argv[2])+".txt"  #Creates file from user inputted element symbol
+
+#Initializes all values that use systems args
+radius = float(sys.argv[1])         #Van Der Waals radius in Angstroms
+filename = str(sys.argv[2])+".txt"  #Output file name
+cloudPath = str(sys.argv[3])        #Path to DIRECTORY with other cached clouds (output DIR)
+
+
 num_pts = int(radius ** 2 * 4 * pi * 4) #makes a consistant number of electrons per radius
 indices = arange(0, num_pts, dtype=float) + 0.5
-path = str(sys.argv[3]) #path to directory of where to save electron clouds
-os.chdir(path)
+os.chdir(cloudPath)
 outFile = open(filename, 'w+')
 xv = []
 yv = []
