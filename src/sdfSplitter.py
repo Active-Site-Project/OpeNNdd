@@ -3,20 +3,25 @@
     file and splits them such that each molecule is saved into its own .sdf file.
     The program will store the new .sdf files into a directory specified by the
     user.
+
+    SYSTEM ARGUMENTS:
+    1) Path to read sdfs containing multiple molecules per sdf
+    2) Path to store new sdfs containing only one molecule per sdf
 """
+
 import pybel
 import os
 import sys
 
-##readPath = str(sys.argv[1])  #the user input the path to read sdf files from
-##storePath = str(sys.argv[2]) #the user inputs path to store the poses into
+
 def main():
-    readPath = str(sys.argv[1]) #dir path you will read the sdf files from
-    storePath = str(sys.argv[2]) #dir path you want to store individual .sdf poses in
+    #Initializes paths using system arguments
+    readPath = str(sys.argv[1])  #the user input the path to read sdf files from
+    storePath = str(sys.argv[2]) #the user inputs path to store the poses into
+
 
     os.chdir(readPath) #Navigate to the folder containing the sdf files to read
     nameList = []
-
     #Keep track of all file names inside of the read folder
     for filename in os.listdir(os.getcwd()):
         if not filename.startswith('.'):
