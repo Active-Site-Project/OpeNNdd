@@ -23,11 +23,11 @@ from mpi4py import MPI
     4) Path to directory containing the electron cloud files
     5) The number of sdf files to be voxelized in each MPI instance
 """
-posesPath = sys.argv[1]          # path to DIR w/ ligand poses
-activeSiteFilePath = sys.argv[2] # path to FILE w/ voxelized active-site
-outputPath = sys.argv[3]         # path to DIR for desired outputs
-cloudPath = sys.argv[4]          # path to DIR containing cached electron clouds
-mult = sys.argv[5]               # number of files to vox per MPI
+posesPath = str(sys.argv[1])          # path to DIR w/ ligand poses
+activeSiteFilePath = str(sys.argv[2]) # path to FILE w/ voxelized active-site
+outputPath = str(sys.argv[3])         # path to DIR for desired outputs
+cloudPath = str(sys.argv[4])          # path to DIR containing cached electron clouds
+mult = int(sys.argv[5])               # number of files to vox per MPI
 
 
 #Initializes variables used for parralelization
