@@ -96,12 +96,12 @@ def main():
         h5f.create_dataset('ligands', shape=(0, ) + shape, maxshape=(None, ) + shape, dtype=dtype, chunks=(chunk_len, ) + shape, compression = compMethod, compression_opts = compLevel)
         shape = label_shape
         h5f.create_dataset('labels', shape=(0, ) + shape, maxshape=(None, ) + shape, dtype=dtype, chunks=(chunk_len, ) + shape, compression = compMethod, compression_opts = compLevel)
-        h5f.create_dataset('file', shape=(0, ) + shape, maxshape=(None, ) + shape, dtype= dt, chunks=(chunk_len, ) + shape, compression = compMethod, compression_opts = compLevel)
+        h5f.create_dataset('filenames', shape=(0, ) + shape, maxshape=(None, ) + shape, dtype= dt, chunks=(chunk_len, ) + shape, compression = compMethod, compression_opts = compLevel)
 
     #Creates data info classes for each dataset
     ligands = dataInfo('ligands', data_shape)
     labels = dataInfo('labels', label_shape)
-    file = dataInfo('file', label_shape)
+    file = dataInfo('filenames', label_shape)
 
     """
         Reads in a directory and saves the names of all files within two indicies.
