@@ -208,13 +208,13 @@ class OpeNNdd_Model:
                     self.flattened = True
                 h_layer += 1
 
-        #Append Final Layer 
+        #Append Final Layer
         if self.flattened:
             self.network.update({'logits': self.dense(self.network[next(reversed(self.network))], self.db.classes, 'logits')})
         else:
             self.network.update({'logits': self.dense(self.flatten(self.network[next(reversed(self.network))]), self.db.classes, 'logits')})
             self.flattened = True
-        
+
         self.network_built = True
 
         #append loss function and then optimizer
@@ -356,14 +356,14 @@ class OpeNNdd_Model:
             metrics_file.write("Testing - Average Root Mean Squared Error: %f KD\n" % (self.test_rmse_arr))
             metrics_file.write("Testing - Average Mean Absolute Percentage Error:  {:0.2f}%".format(self.test_mape_arr))
             metrics_file.write("\nTesting - R^2: %f"%(self.test_r_squared))
-            
+
             test_file = open(os.path.join(folder, 'test_values_'+str(self.id)+'.txt'), 'w')
             for i in range(self.db.total_test_ligands):
                 test_file.write(str(self.test_filenames[i])[4:-2]+'\n')
                 test_file.write('Actual: '+str(self.test_actual[i])[1:-1]+'\n')
                 test_file.write('Predicted: '+str(self.test_predict[i])[1:-1]+'\n\n')
             test_file.close()
-            
+
         metrics_file.close() #close file
 
     #train the model...includes validation
@@ -487,10 +487,10 @@ class OpeNNdd_Model:
                 total_mse += mse
                 total_rmse += rmse
                 total_mape += mape
-                
+
                 for filename in test_filenames:
                     self.test_filenames.append(filename)
-                    
+
                 self.test_actual = np.append(self.test_actual,targets)
                 self.test_predict = np.append(self.test_predict,outputs)
 
@@ -519,7 +519,7 @@ class OpeNNdd_Model:
 
 if __name__ == '__main__':
     #Constants
-    BATCH_SIZE = 25 #images per batch
+    BATCH_SIZE = 6 #images per batch
     CHANNELS = 6
     HDF5_DATA_FILE = str(sys.argv[1]) #path to hdf5 data file
     MODEL1_STORAGE_DIR = str(sys.argv[2])  #path to where we would like our model stored
@@ -540,4 +540,3 @@ if __name__ == '__main__':
 
     model.train() #train the model
     model.test() #test the model and get the error
-
