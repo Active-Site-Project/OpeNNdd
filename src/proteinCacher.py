@@ -15,14 +15,14 @@ import os
 import sys
 from math import ceil
 
+"""
+outDirectory = Output DIRECTORY
+eDirectory = ElectronClouds DIRECTORY
+poseFile = Protein PDB FILE
+outName = Name of output hdf5 file
+"""
 
-#Initialize variables that use the system arguments
-outDirectory = str(sys.argv[1]) #Output DIRECTORY
-eDirectory = str(sys.argv[2])   #ElectronClouds DIRECTORY
-poseFile = str(sys.argv[3])     #Protein PDB FILE
-outName = str(sys.argv[4])      #Name of output hdf5 file
-
-def main():
+def cacher(outDirectory, eDirectory, poseFile, outName):
     coords = [] #nucleus xyz location
     aNum = []  #elements atomic number
     ePos = [] #electron coordinateds in relation to nuclei
@@ -141,4 +141,4 @@ def gNum(anum):
 if __name__ == "__main__":
     voxelRes = .5 #cubic width of voxels
     voxelLWH = 72 #width lenght and height of the voxel grid
-    main()
+    cacher(str(sys.argv[1]), str(sys.argv[2]), str(sys.argv[3]), str(sys.argv[4]))
