@@ -527,7 +527,7 @@ if __name__ == '__main__':
     if str(sys.argv[3]).lower() == "gpu": #argument for whether or not 'cpu' or 'gpu' mode
         model = OpeNNdd_Model(HDF5_DATA_FILE, BATCH_SIZE,       #sample gpu model that should fit on 3gb gpu
                                 [32,64], [5,5], [], [2,2], [0.4],
-                                [1024], tf.losses.mean_squared_error,
+                                [128], tf.losses.mean_squared_error,
                                 tf.train.AdamOptimizer(1e-4), 'CPCPDH',
                                 MODEL1_STORAGE_DIR, gpu_mode=True, db_mode='ru')
     else:

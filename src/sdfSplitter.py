@@ -13,12 +13,13 @@ import pybel
 import os
 import sys
 
+"""
+readPath = the user input the path to read sdf files from
+storePath = the user inputs path to store the poses into
+"""
 
-def main():
+def splitter(readPath, storePath):
     #Initializes paths using system arguments
-    readPath = str(sys.argv[1])  #the user input the path to read sdf files from
-    storePath = str(sys.argv[2]) #the user inputs path to store the poses into
-
 
     os.chdir(readPath) #Navigate to the folder containing the sdf files to read
     nameList = []
@@ -44,4 +45,4 @@ def main():
 
 #Run the main fuction
 if __name__ == "__main__":
-    main()
+    splitter(str(sys.argv[1]), sys.argv[2])

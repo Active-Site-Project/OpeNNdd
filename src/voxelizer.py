@@ -23,11 +23,6 @@ from mpi4py import MPI
     4) Path to directory containing the electron cloud files
     5) The number of sdf files to be voxelized in each MPI instance
 """
-posesPath = str(sys.argv[1])          # path to DIR w/ ligand poses
-activeSiteFilePath = str(sys.argv[2]) # path to FILE w/ voxelized active-site
-outputPath = str(sys.argv[3])         # path to DIR for desired outputs
-cloudPath = str(sys.argv[4])          # path to DIR containing cached electron clouds
-mult = int(sys.argv[5])               # number of files to vox per MPI
 
 
 #Initializes variables used for parralelization
@@ -53,7 +48,7 @@ class dataInfo:
         self.shape = shape
         self.i = 0
 
-    def appendVal(self, values):
+    def appendVal(self, values, outputPath):
         os.chdir(outputPath)
         with h5py.File(outName, mode='a') as h5f:
             dset = h5f[self.dataset]
@@ -62,8 +57,14 @@ class dataInfo:
             self.i += 1
             h5f.flush()
 
-
-def main():
+"""
+	posesPath = path to DIR w/ ligand poses
+	activeSiteFilePath = path to FILE w/ voxelized active-site
+	outputPath = path to DIR for desired outputs
+	cloudPath = path to DIR containing cached electron clouds
+	mult = number of files to vox per MPI
+"""
+def voxelizer(posesPath, activeSiteFilePath, outputPath, cloudPath, mult):
     """
         Reads in cached active site HDF5 file and retrieves cached voxelized
         active-site information as well as all x, y, z transformations that
@@ -108,8 +109,8 @@ def main():
         These files are the sdfs that are going to be voxelized by the current MPI.
     """
     os.chdir(posesPath)
-    fromSdf = getFrom()  #Uses mpi to get an index number of what file to begin reading from (based on mult var)
-    toSdf = getTo()      #Uses mpi to get an index number of what file to stop reading at (based on mult var)
+    fromSdf = getFrom(rank, mult)  #Uses mpi to get an index number of what file to begin reading from (based on mult var)
+    toSdf = getTo(rank, mult)      #Uses mpi to get an index number of what file to stop reading at (based on mult var)
     fileList = []
     for f in os.listdir(posesPath):
         if not f.startswith('.'):
@@ -130,16 +131,12 @@ def main():
         data, and saved to an hdf5 file.
     """
     for i in desiredFiles:
-        sdfVox(i, siteMatrix, trans, ligands, labels, file)
-
+        sdfVox(i, siteMatrix, trans, ligands, labels, file, posesPath, cloudPath, outputPath)
 
 
 #Scales values to fit desired resolution
 def upResCalculation(value):
     return int((value-(value % voxRes)) * (1/voxRes))
-
-
-
 
 
 #Electron clouds are simplified into voxel form
@@ -174,7 +171,7 @@ def addRoundHundredth(num1,num2):
 
 
 #Voxelizes sdf ligand
-def sdfVox(name, activeMatrix, trans, d, l, f):
+def sdfVox(name, activeMatrix, trans, d, l, f, posesPath, cloudPath, outputPath):
     """
         Read in all molecules form the sdf files and save to list
     """
@@ -234,24 +231,24 @@ def sdfVox(name, activeMatrix, trans, d, l, f):
         """
         molEnergy = mol.data['minimizedAffinity']
         outEnergy = np.asarray(molEnergy, dtype = np.float32)
-        d.appendVal(dockedLigandMatrix)  #Appends matrix
-        l.appendVal(outEnergy)           #Appends energy
-        f.appendVal(np.string_(name))    #Appends file name
+        d.appendVal(dockedLigandMatrix, outputPath)  #Appends matrix
+        l.appendVal(outEnergy, outputPath)           #Appends energy
+        f.appendVal(np.string_(name), outputPath)    #Appends file name
     os.chdir(posesPath)
 
 
 #Uses mpi rank to calculate the max indicies of files to be voxelized
-def getTo():
+def getTo(rank, mult):
     toNum = ((rank+1)*mult)
     return toNum
 
 
 #Uses mpi rank to calculate the min indicies of files to be voxelized
-def getFrom():
+def getFrom(rank, mult):
     fromNum = (rank * mult)
     return fromNum
 
 
 #Run the main fuction
 if __name__ == "__main__":
-    main()
+    voxelizer(str(sys.argv[1]), str(sys.argv[2]), str(sys.argv[3]), str(sys.argv[4]), int(sys.argv[5]))
